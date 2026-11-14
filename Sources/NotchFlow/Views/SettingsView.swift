@@ -380,9 +380,9 @@ private struct WidgetsSettings: View {
 private struct AboutSettings: View {
     var body: some View {
         VStack(spacing: 14) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 48))
-                .foregroundStyle(.linearGradient(colors: [.purple, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 112, height: 112)
             Text("NotchFlow").font(.largeTitle.bold())
             Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
                 .foregroundStyle(.secondary)

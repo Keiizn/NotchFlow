@@ -16,9 +16,21 @@ rm -rf "${APP}"
 mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources"
 cp "$BIN_DIR/NotchFlow" "${APP}/Contents/MacOS/NotchFlow"
 cp Support/Info.plist "${APP}/Contents/Info.plist"
-if [ -f Support/AppIcon.icns ]; then
-  cp Support/AppIcon.icns "${APP}/Contents/Resources/AppIcon.icns"
-  /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "${APP}/Contents/Info.plist" || true
+
+# Icône : génère l'.icns à partir de Support/AppIcon.png (1024×1024)
+if [ -f Support/AppIcon.png ]; then
+  echo "▸ Génération de l'icône…"
+  ICONSET="build/AppIcon.iconset"
+  rm -rf "${ICONSET}" && mkdir -p "${ICONSET}"
+  for size in 16 32 128 256 512; do
+    sips -z ${size} ${size} Support/AppIcon.png --out "${ICONSET}/icon_${size}x${size}.png" >/dev/null
+    double=$((size * 2))
+    sips -z ${double} ${double} Support/AppIcon.png --out "${ICONSET}/icon_${size}x${size}@2x.png" >/dev/null
+  done
+  iconutil -c icns "${ICONSET}" -o "${APP}/Contents/Resources/AppIcon.icns"
+  rm -rf "${ICONSET}"
+  /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "${APP}/Contents/Info.plist" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon" "${APP}/Contents/Info.plist"
 fi
 
 echo "▸ Signature ad hoc…"
