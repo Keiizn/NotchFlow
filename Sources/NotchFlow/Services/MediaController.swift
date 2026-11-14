@@ -118,9 +118,16 @@ final class MediaController: ObservableObject {
         return track.duration > 0 ? min(max(p, 0), track.duration) : max(p, 0)
     }
 
-    private func setPosition(_ value: Double) {
+    /// `measuredAt` : instant où la position a été lue (et non reçue), pour ne pas
+    /// accumuler le délai d'AppleScript — indispensable pour des paroles bien synchronisées.
+    private func setPosition(_ value: Double, measuredAt date: Date = Date()) {
         position = value
-        positionDate = Date()
+        positionDate = date
+    }
+
+    /// Milieu de l'aller-retour AppleScript : meilleure estimation de l'instant de lecture.
+    private static func midpoint(since start: Date) -> Date {
+        start.addingTimeInterval(Date().timeIntervalSince(start) / 2)
     }
 
     // MARK: - Commandes
@@ -253,6 +260,7 @@ final class MediaController: ObservableObject {
     /// de séparateur décimal selon la langue du système.
     private func fetchState(_ src: MediaSource) {
         guard src.isRunning, !src.isBrowser else { return }
+        let requestedAt = Date()
         run(Self.stateScript(for: src)) { [weak self] result in
             guard let self, let text = result?.stringValue else { return }
             if text == "stopped" {
@@ -269,7 +277,7 @@ final class MediaController: ObservableObject {
                 duration: (Double(parts[4]) ?? 0) / 1000
             )
             self.apply(source: src, track: t, playing: playing)
-            self.setPosition((Double(parts[5]) ?? 0) / 1000)
+            self.setPosition((Double(parts[5]) ?? 0) / 1000, measuredAt: Self.midpoint(since: requestedAt))
         }
     }
 
@@ -348,9 +356,11 @@ final class MediaController: ObservableObject {
             return
         }
         let src = list[index]
+        let requestedAt = Date()
         run(Self.browserScript(src, js: Self.browserInfoJS)) { [weak self] result in
             guard let self else { return }
-            if let text = result?.stringValue, !text.isEmpty, self.handleBrowserResult(text, from: src) {
+            if let text = result?.stringValue, !text.isEmpty,
+               self.handleBrowserResult(text, from: src, measuredAt: Self.midpoint(since: requestedAt)) {
                 self.browserPollInFlight = false
             } else {
                 self.pollBrowser(in: list, at: index + 1)
@@ -358,7 +368,7 @@ final class MediaController: ObservableObject {
         }
     }
 
-    private func handleBrowserResult(_ text: String, from src: MediaSource) -> Bool {
+    private func handleBrowserResult(_ text: String, from src: MediaSource, measuredAt: Date) -> Bool {
         guard let data = text.data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let title = object["t"] as? String else { return false }
@@ -374,7 +384,7 @@ final class MediaController: ObservableObject {
 
         let newTrack = Track(id: "\(src.rawValue)|\(title)|\(artist)", title: title, artist: artist, album: album, duration: duration)
         apply(source: src, track: newTrack, playing: playing)
-        setPosition(position)
+        setPosition(position, measuredAt: measuredAt)
         return true
     }
 

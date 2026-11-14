@@ -214,8 +214,31 @@ struct LyricsView: View {
                 }
             case .synced:
                 synced
+                    .overlay(alignment: .topTrailing) { offsetControls }
             }
         }
+    }
+
+    /// Réglage manuel si les paroles sont en avance / en retard.
+    private var offsetControls: some View {
+        HStack(spacing: 2) {
+            Button { lyrics.nudge(-0.5) } label: { Image(systemName: "minus") }
+                .help("Paroles plus tard")
+            Text(lyrics.offset == 0 ? "synchro" : String(format: "%+.1f s", lyrics.offset))
+                .font(.system(size: 9, weight: .semibold))
+                .monospacedDigit()
+                .frame(minWidth: 40)
+                .onTapGesture { lyrics.offset = 0 }
+                .help("Cliquer pour réinitialiser")
+            Button { lyrics.nudge(0.5) } label: { Image(systemName: "plus") }
+                .help("Paroles plus tôt")
+        }
+        .font(.system(size: 9, weight: .bold))
+        .buttonStyle(PressableButtonStyle())
+        .foregroundStyle(.white.opacity(0.7))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(Color.black.opacity(0.35)))
     }
 
     private var synced: some View {
