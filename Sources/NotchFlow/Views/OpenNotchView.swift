@@ -24,6 +24,7 @@ struct OpenNotchView: View {
     private var tabContent: some View {
         switch vm.tab {
         case .home: HomeView(ns: ns)
+        case .battery: BatteryView()
         case .apps: AppsView()
         case .shelf: ShelfView()
         case .timer: TimerView()

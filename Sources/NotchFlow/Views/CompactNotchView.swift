@@ -118,6 +118,11 @@ struct CompactNotchView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.orange)
                 .symbolEffect(.bounce, value: kind)
+        case .chargeLimited:
+            Image(systemName: "leaf.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.green)
+                .symbolEffect(.bounce, value: kind)
         }
     }
 
@@ -131,6 +136,12 @@ struct CompactNotchView: View {
         case .brightness(let level):
             HUDSlider(value: Double(level), color: .yellow) { BrightnessService.shared.set(Float($0)) }
                 .frame(width: 60)
+        case .chargeLimited(let limit):
+            HStack(spacing: 3) {
+                Text("\(limit) %").font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                Text("max").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+            }
+            .foregroundStyle(.green)
         case .reminder(let title):
             Text(title)
                 .font(.system(size: 11, weight: .semibold))

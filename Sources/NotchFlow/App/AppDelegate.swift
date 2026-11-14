@@ -33,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = BrightnessService.shared
         _ = RemindersService.shared
         _ = QuickActions.shared
+        _ = BatteryManager.shared
         WeatherService.shared.start()
 
         setupStatusItem()
@@ -40,6 +41,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = NotchWindowController()
         controller.show()
         notchController = controller
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Rend la gestion de charge à macOS si l'utilisateur l'a demandé.
+        BatteryManager.shared.restoreForQuit()
     }
 
     // MARK: - Barre des menus

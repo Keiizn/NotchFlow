@@ -6,11 +6,12 @@ import ServiceManagement
 @MainActor
 struct SettingsView: View {
     enum Section: String, CaseIterable, Identifiable {
-        case general, appearance, activities, controls, music, tabs, apps, widgets, about
+        case general, appearance, activities, battery, controls, music, tabs, apps, widgets, about
         var id: String { rawValue }
         var title: String {
             switch self {
             case .general: "Général"
+            case .battery: "Batterie"
             case .appearance: "Apparence"
             case .activities: "Activités en direct"
             case .controls: "Contrôles & raccourcis"
@@ -27,6 +28,7 @@ struct SettingsView: View {
             case .appearance: "paintbrush.fill"
             case .activities: "waveform"
             case .controls: "keyboard.fill"
+            case .battery: "battery.100.bolt"
             case .music: "music.note"
             case .tabs: "square.grid.2x2.fill"
             case .apps: "app.badge.fill"
@@ -40,6 +42,7 @@ struct SettingsView: View {
             case .appearance: .purple
             case .activities: .pink
             case .controls: .cyan
+            case .battery: .green
             case .music: .red
             case .tabs: .blue
             case .apps: .indigo
@@ -75,6 +78,7 @@ struct SettingsView: View {
                 case .appearance: AppearanceSettings()
                 case .activities: ActivitiesSettings()
                 case .controls: ControlsSettings()
+                case .battery: BatterySettings()
                 case .music: MusicSettings()
                 case .tabs: TabsSettings()
                 case .apps: AppsSettings()
@@ -273,6 +277,105 @@ private struct ActivitiesSettings: View {
         Toggle(isOn: binding) {
             SettingsRowLabel(title: title, subtitle: subtitle, icon: icon, color: color)
         }
+    }
+}
+
+// MARK: - Batterie
+
+@MainActor
+private struct BatterySettings: View {
+    @EnvironmentObject private var settings: AppSettings
+    @ObservedObject private var manager = BatteryManager.shared
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("Assistant de charge") {
+                    switch manager.helperState {
+                    case .checking:
+                        ProgressView().controlSize(.small)
+                    case .ready:
+                        HStack {
+                            Label("Installé", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                            Button("Désinstaller…", role: .destructive) { manager.uninstallHelper() }
+                        }
+                    case .notInstalled:
+                        Button("Installer…") { manager.installHelper() }
+                    case .outdated:
+                        Button("Mettre à jour…") { manager.installHelper() }
+                    case .unsupported:
+                        Text("Non pris en charge sur ce Mac").foregroundStyle(.secondary)
+                    }
+                }
+                if let error = manager.lastError {
+                    Text(error).font(.caption).foregroundStyle(.orange)
+                }
+            } header: {
+                Text("Installation")
+            } footer: {
+                Text("Pour limiter la charge, macOS exige des droits administrateur. NotchFlow installe un petit assistant (/usr/local/libexec/notchflow-smc) qui ne sait faire que « charge on/off » et « adaptateur on/off », autorisé sans mot de passe pour votre compte uniquement. Votre mot de passe est demandé une seule fois.")
+            }
+
+            Section {
+                Toggle(isOn: $settings.chargeLimiterEnabled) {
+                    SettingsRowLabel(title: "Limiter la charge", subtitle: "Le Mac reste alimenté par le secteur, la batterie ne dépasse pas la limite", icon: "leaf.fill", color: .green)
+                }
+                .disabled(manager.helperState != .ready)
+
+                LabeledContent("Limite de charge") {
+                    HStack {
+                        Slider(value: Binding(
+                            get: { Double(settings.chargeLimit) },
+                            set: { settings.chargeLimit = Int($0) }
+                        ), in: 20...100, step: 5)
+                        Text("\(settings.chargeLimit) %").monospacedDigit().frame(width: 48, alignment: .trailing)
+                    }
+                }
+                LabeledContent("Marge de reprise") {
+                    HStack {
+                        Slider(value: Binding(
+                            get: { Double(settings.sailingRange) },
+                            set: { settings.sailingRange = Int($0) }
+                        ), in: 1...15, step: 1)
+                        Text("\(settings.sailingRange) %").monospacedDigit().frame(width: 48, alignment: .trailing)
+                    }
+                }
+                Toggle("Décharger jusqu'à la limite quand le Mac est branché", isOn: $settings.dischargeToLimit)
+            } header: {
+                Text("Limite de charge")
+            } footer: {
+                Text("Exemple : limite 80 %, marge 5 % → la charge s'arrête à 80 % et ne reprend que sous 75 %, ce qui évite les micro-recharges qui usent la batterie. Désactivez « Recharge optimisée » dans Réglages Système → Batterie pour éviter les conflits.")
+            }
+
+            Section {
+                Toggle("Protection thermique", isOn: $settings.heatProtection)
+                if settings.heatProtection {
+                    LabeledContent("Pause de la charge au-dessus de") {
+                        HStack {
+                            Slider(value: $settings.heatLimit, in: 30...45, step: 1)
+                            Text("\(Int(settings.heatLimit)) °C").monospacedDigit().frame(width: 48, alignment: .trailing)
+                        }
+                    }
+                }
+                Toggle("Rétablir la charge normale quand NotchFlow se ferme", isOn: $settings.restoreChargingOnQuit)
+            } header: {
+                Text("Protection")
+            } footer: {
+                Text("La chaleur est l'ennemie n°1 des batteries lithium : la charge est mise en pause si la batterie dépasse la température choisie.")
+            }
+
+            Section("Santé de la batterie") {
+                LabeledContent("Capacité maximale", value: manager.health.healthPercent > 0 ? "\(manager.health.healthPercent) %" : "—")
+                LabeledContent("Cycles", value: "\(manager.health.cycleCount)")
+                LabeledContent("Capacité", value: "\(manager.health.maxCapacity) / \(manager.health.designCapacity) mAh")
+                LabeledContent("Température", value: String(format: "%.1f °C", manager.health.temperature))
+                if manager.health.adapterWatts > 0 {
+                    LabeledContent("Adaptateur", value: "\(manager.health.adapterWatts) W \(manager.health.adapterName)")
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear { manager.refreshHealth() }
     }
 }
 

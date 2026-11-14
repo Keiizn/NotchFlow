@@ -8,11 +8,12 @@ final class NotchViewModel: ObservableObject {
     enum State { case closed, open }
 
     enum Tab: String, CaseIterable, Identifiable {
-        case home, apps, shelf, timer, reminders, actions, notes, clipboard, system, mirror
+        case home, battery, apps, shelf, timer, reminders, actions, notes, clipboard, system, mirror
         var id: String { rawValue }
         var icon: String {
             switch self {
             case .home: "house.fill"
+            case .battery: "battery.100.bolt"
             case .apps: "square.grid.3x3.fill"
             case .shelf: "tray.full.fill"
             case .timer: "timer"
@@ -27,6 +28,7 @@ final class NotchViewModel: ObservableObject {
         var title: String {
             switch self {
             case .home: "Accueil"
+            case .battery: "Batterie"
             case .apps: "Applications"
             case .shelf: "Étagère"
             case .timer: "Minuteur"
@@ -41,6 +43,7 @@ final class NotchViewModel: ObservableObject {
         var subtitle: String {
             switch self {
             case .home: "Musique, agenda et météo"
+            case .battery: "Limite de charge, décharge, santé de la batterie"
             case .apps: "Lanceur d'apps favorites et apps ouvertes"
             case .shelf: "Déposez des fichiers, partagez-les par AirDrop"
             case .timer: "Minuteur et Pomodoro"
@@ -69,6 +72,7 @@ final class NotchViewModel: ObservableObject {
         case update(String)        // nouvelle version en cours d'installation
         case brightness(Float)
         case reminder(String)
+        case chargeLimited(Int)    // charge limitée à X %
     }
 
     /// Affiche les paroles à la place de l'agenda sur l'accueil.
@@ -130,7 +134,14 @@ final class NotchViewModel: ObservableObject {
             .sink { [weak self] event in
                 guard let self, self.settings.showBatteryActivity else { return }
                 switch event {
-                case .pluggedIn(let level): self.showHUD(.charging(level), duration: 2.6)
+                case .pluggedIn(let level):
+                    let manager = BatteryManager.shared
+                    let limit = self.settings.chargeLimit
+                    if manager.isLimiterActive && !manager.topUpActive && level >= limit - self.settings.sailingRange {
+                        self.showHUD(.chargeLimited(limit), duration: 2.6)
+                    } else {
+                        self.showHUD(.charging(level), duration: 2.6)
+                    }
                 case .unplugged(let level): self.showHUD(.unplugged(level))
                 }
             }
@@ -144,6 +155,13 @@ final class NotchViewModel: ObservableObject {
             .sink { [weak self] in
                 guard let self, self.settings.showVolumeHUD else { return }
                 self.showHUD(.brightness(BrightnessService.shared.brightness))
+            }
+            .store(in: &cancellables)
+
+        BatteryManager.shared.limitReached
+            .sink { [weak self] limit in
+                guard let self, self.settings.showBatteryActivity else { return }
+                self.showHUD(.chargeLimited(limit), duration: 3)
             }
             .store(in: &cancellables)
 

@@ -42,7 +42,26 @@ final class AppSettings: ObservableObject {
         static let browserMedia = "browserMedia"
         static let showReminderActivity = "showReminderActivity"
         static let tabsMigration = "tabsMigrationV2"
+        static let tabsMigrationBattery = "tabsMigrationV3"
+        static let chargeLimiterEnabled = "chargeLimiterEnabled"
+        static let chargeLimit = "chargeLimit"
+        static let sailingRange = "sailingRange"
+        static let dischargeToLimit = "dischargeToLimit"
+        static let heatProtection = "heatProtection"
+        static let heatLimit = "heatLimit"
+        static let restoreChargingOnQuit = "restoreChargingOnQuit"
     }
+
+    // MARK: Batterie (façon AlDente)
+    @Published var chargeLimiterEnabled: Bool { didSet { store(chargeLimiterEnabled, Keys.chargeLimiterEnabled) } }
+    /// Pourcentage maximum de charge (20…100).
+    @Published var chargeLimit: Int { didSet { store(chargeLimit, Keys.chargeLimit) } }
+    /// Marge de « navigation » : la charge ne reprend que sous (limite − marge).
+    @Published var sailingRange: Int { didSet { store(sailingRange, Keys.sailingRange) } }
+    @Published var dischargeToLimit: Bool { didSet { store(dischargeToLimit, Keys.dischargeToLimit) } }
+    @Published var heatProtection: Bool { didSet { store(heatProtection, Keys.heatProtection) } }
+    @Published var heatLimit: Double { didSet { store(heatLimit, Keys.heatLimit) } }
+    @Published var restoreChargingOnQuit: Bool { didSet { store(restoreChargingOnQuit, Keys.restoreChargingOnQuit) } }
 
     enum Theme: String, CaseIterable, Identifiable {
         case glass, black
@@ -63,7 +82,7 @@ final class AppSettings: ObservableObject {
     @Published var autoInstallUpdates: Bool { didSet { store(autoInstallUpdates, Keys.autoInstallUpdates) } }
 
     /// Onglets activés par défaut (le miroir est désactivé par défaut).
-    static let defaultTabs = ["home", "apps", "shelf", "timer", "reminders", "actions", "notes", "clipboard", "system"]
+    static let defaultTabs = ["home", "battery", "apps", "shelf", "timer", "reminders", "actions", "notes", "clipboard", "system"]
 
     @Published var enabledTabs: [String] { didSet { store(enabledTabs, Keys.enabledTabs) } }
     @Published var favoriteApps: [String] { didSet { store(favoriteApps, Keys.favoriteApps) } }
@@ -141,6 +160,13 @@ final class AppSettings: ObservableObject {
             Keys.showLyrics: true,
             Keys.browserMedia: true,
             Keys.showReminderActivity: true,
+            Keys.chargeLimiterEnabled: false,
+            Keys.chargeLimit: 80,
+            Keys.sailingRange: 5,
+            Keys.dischargeToLimit: false,
+            Keys.heatProtection: true,
+            Keys.heatLimit: 35.0,
+            Keys.restoreChargingOnQuit: true,
             Keys.enabledTabs: Self.defaultTabs,
             Keys.closeOnClickOutside: true,
             Keys.showShadow: true,
@@ -189,6 +215,21 @@ final class AppSettings: ObservableObject {
         showLyrics = d.bool(forKey: Keys.showLyrics)
         browserMedia = d.bool(forKey: Keys.browserMedia)
         showReminderActivity = d.bool(forKey: Keys.showReminderActivity)
+        chargeLimiterEnabled = d.bool(forKey: Keys.chargeLimiterEnabled)
+        chargeLimit = min(max(d.integer(forKey: Keys.chargeLimit), 20), 100)
+        sailingRange = min(max(d.integer(forKey: Keys.sailingRange), 1), 20)
+        dischargeToLimit = d.bool(forKey: Keys.dischargeToLimit)
+        heatProtection = d.bool(forKey: Keys.heatProtection)
+        heatLimit = d.double(forKey: Keys.heatLimit)
+        restoreChargingOnQuit = d.bool(forKey: Keys.restoreChargingOnQuit)
+
+        if !d.bool(forKey: Keys.tabsMigrationBattery) {
+            if !enabledTabs.contains("battery") {
+                enabledTabs.insert("battery", at: min(1, enabledTabs.count))
+            }
+            d.set(enabledTabs, forKey: Keys.enabledTabs)
+            d.set(true, forKey: Keys.tabsMigrationBattery)
+        }
 
         // Ajoute une seule fois les nouveaux onglets (Rappels, Actions) aux listes déjà personnalisées.
         if !d.bool(forKey: Keys.tabsMigration) {

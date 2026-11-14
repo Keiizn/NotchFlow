@@ -25,6 +25,14 @@ Le notch grossit légèrement au survol, s'ouvre au survol (délai réglable) ou
 - **Presse-papiers** : historique des 30 derniers textes copiés (les mots de passe des gestionnaires sont ignorés), clic = recopier.
 - **Miroir** : aperçu de la caméra avant une visio.
 
+### Nouveautés 1.4 — gestion de la batterie (façon AlDente)
+- **Limite de charge** (20–100 %, 80 % recommandé) : le Mac reste alimenté par le secteur mais la batterie ne dépasse pas la limite.
+- **Marge de reprise** (« sailing ») : la charge ne reprend que sous *limite − marge*, pour éviter les micro-recharges.
+- **Décharge forcée** jusqu'à la limite même branché, **charge ponctuelle à 100 %** (avant un déplacement), **protection thermique**.
+- **Santé** : capacité réelle vs d'origine, cycles, température, puissance entrante/sortante, adaptateur.
+- Live Activity « 🍃 80 % max » quand la limite est atteinte ou au branchement.
+- Fonctionne via un petit assistant root (`/usr/local/libexec/notchflow-smc`, code dans `Sources/notchflow-smc`) installé une fois avec le mot de passe administrateur. Il n'accepte que `charging on|off`, `adapter on|off`, `status` et `version`. Désinstallation depuis Réglages → Batterie.
+
 ### Nouveautés 1.3
 - **Design Liquid Glass** : notch ouvert en verre dépoli translucide (reflets, liseré lumineux, cartes « widgets »), opacité réglable. Le thème « Noir classique » reste disponible.
 - **HUD natifs volume & luminosité** : les touches du clavier affichent le HUD du notch à la place de celui de macOS, avec un curseur réglable à la souris (⌥⇧ = réglage fin). Nécessite l'autorisation Accessibilité.

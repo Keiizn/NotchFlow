@@ -15,6 +15,7 @@ echo "▸ Assemblage de ${APP}…"
 rm -rf "${APP}"
 mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources"
 cp "$BIN_DIR/NotchFlow" "${APP}/Contents/MacOS/NotchFlow"
+cp "$BIN_DIR/notchflow-smc" "${APP}/Contents/MacOS/notchflow-smc"
 cp Support/Info.plist "${APP}/Contents/Info.plist"
 
 # Version : tag git (v1.2.3 → 1.2.3), numéro de build = nombre de commits
@@ -46,6 +47,7 @@ if [ -f Support/AppIcon.png ]; then
 fi
 
 echo "▸ Signature ad hoc…"
+codesign --force --options runtime --sign - "${APP}/Contents/MacOS/notchflow-smc"
 codesign --force --deep --options runtime \
   --entitlements Support/NotchFlow.entitlements \
   --sign - "${APP}"
