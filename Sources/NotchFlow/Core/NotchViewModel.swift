@@ -167,11 +167,17 @@ final class NotchViewModel: ObservableObject {
     var topOffset: CGFloat { settings.style == .island && !hasPhysicalNotch ? 6 : 0 }
 
     var closedSize: CGSize {
-        CGSize(
-            width: notchSize.width + 2 * closedEarRadius + 2 * sideWidth(for: activity),
-            height: notchSize.height
+        // Au survol, le notch s'élargit et s'allonge légèrement (comme sur iPhone),
+        // sans déformer son contenu.
+        let grow = isHovering && settings.hoverGrow
+        return CGSize(
+            width: notchSize.width + 2 * closedEarRadius + 2 * sideWidth(for: activity) + (grow ? 14 : 0),
+            height: notchSize.height + (grow ? 5 : 0)
         )
     }
+
+    /// Ressort unique utilisé pour toutes les transitions de forme : rapide, sans rebond excessif.
+    static let shapeSpring = Animation.spring(response: 0.38, dampingFraction: 0.86)
 
     var openSize: CGSize {
         CGSize(width: CGFloat(settings.openWidth), height: notchSize.height + CGFloat(settings.openHeight))
@@ -195,9 +201,7 @@ final class NotchViewModel: ObservableObject {
         case .closed:
             let zone = screenRect(for: closedSize).insetBy(dx: -8, dy: -4)
             if zone.contains(point) {
-                if !isHovering {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { isHovering = true }
-                }
+                if !isHovering { isHovering = true }
                 if dragging {
                     if dragContainsFiles() { open(tab: .shelf) }
                 } else if settings.openOnHover {
@@ -240,9 +244,7 @@ final class NotchViewModel: ObservableObject {
     private func cancelOpen() {
         openTask?.cancel()
         openTask = nil
-        if isHovering {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { isHovering = false }
-        }
+        if isHovering { isHovering = false }
     }
 
     private func scheduleClose() {
@@ -270,7 +272,7 @@ final class NotchViewModel: ObservableObject {
         guard state != .open else { return }
         hasEnteredOpenZone = screenRect(for: openSize).insetBy(dx: -16, dy: -16).contains(NSEvent.mouseLocation)
         hudTask?.cancel()
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.78)) {
+        withAnimation(Self.shapeSpring) {
             hud = nil
             state = .open
         }
@@ -282,7 +284,7 @@ final class NotchViewModel: ObservableObject {
     func close() {
         cancelClose()
         guard state == .open else { return }
-        withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) {
+        withAnimation(.spring(response: 0.36, dampingFraction: 0.92)) {
             state = .closed
             isHovering = false
         }

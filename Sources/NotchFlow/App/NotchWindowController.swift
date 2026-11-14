@@ -16,7 +16,9 @@ final class NotchPanel: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
-        level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
+        // Au-dessus de la barre des menus (dessinée plus haut depuis macOS 26 Tahoe),
+        // sinon les titres de menus apparaissent par-dessus le notch ouvert.
+        level = .popUpMenu
         collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
         isMovable = false
         isFloatingPanel = true

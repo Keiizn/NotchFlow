@@ -20,7 +20,6 @@ struct NotchRootView: View {
                     height: size.height
                 ))
                 .shadow(color: .black.opacity(vm.isOpen && settings.showShadow ? 0.5 : 0), radius: 16, y: 6)
-                .scaleEffect(vm.isHovering && !vm.isOpen && settings.hoverGrow ? 1.06 : 1, anchor: .top)
                 .padding(.top, vm.topOffset)
                 .onTapGesture { if !vm.isOpen { vm.open() } }
                 .onDrop(of: [UTType.fileURL], isTargeted: $vm.isDropTargeted) { providers in
@@ -29,7 +28,7 @@ struct NotchRootView: View {
         }
         .frame(width: vm.windowSize.width, height: vm.windowSize.height, alignment: .top)
         .ignoresSafeArea()
-        .animation(.spring(response: 0.42, dampingFraction: 0.78), value: size)
+        .animation(NotchViewModel.shapeSpring, value: size)
         .environment(\.colorScheme, .dark)
         .onChange(of: vm.isDropTargeted) { _, targeted in
             if targeted { vm.open(tab: .shelf) }
@@ -42,9 +41,9 @@ struct NotchRootView: View {
             OpenNotchView(ns: ns)
                 .transition(.asymmetric(
                     insertion: .opacity
-                        .combined(with: .scale(scale: 0.92, anchor: .top))
-                        .combined(with: .offset(y: -6)),
-                    removal: .opacity.animation(.easeOut(duration: 0.12))
+                        .combined(with: .scale(scale: 0.97, anchor: .top))
+                        .animation(.easeOut(duration: 0.22).delay(0.08)),
+                    removal: .opacity.animation(.easeOut(duration: 0.1))
                 ))
         } else {
             CompactNotchView(ns: ns)
