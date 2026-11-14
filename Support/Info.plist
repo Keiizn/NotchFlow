@@ -29,7 +29,11 @@
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>NotchFlow contrôle Spotify et Musique pour afficher et piloter le morceau en cours dans le notch.</string>
+    <string>NotchFlow pilote Spotify, Musique et les lecteurs web de votre navigateur pour afficher le morceau en cours, et System Events pour le mode sombre.</string>
+    <key>NSRemindersUsageDescription</key>
+    <string>NotchFlow affiche et coche vos rappels dans le notch.</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>NotchFlow affiche et coche vos rappels dans le notch.</string>
     <key>NSCalendarsFullAccessUsageDescription</key>
     <string>NotchFlow affiche vos prochains événements dans le notch.</string>
     <key>NSCalendarsUsageDescription</key>

@@ -25,6 +25,15 @@ Le notch grossit légèrement au survol, s'ouvre au survol (délai réglable) ou
 - **Presse-papiers** : historique des 30 derniers textes copiés (les mots de passe des gestionnaires sont ignorés), clic = recopier.
 - **Miroir** : aperçu de la caméra avant une visio.
 
+### Nouveautés 1.3
+- **Design Liquid Glass** : notch ouvert en verre dépoli translucide (reflets, liseré lumineux, cartes « widgets »), opacité réglable. Le thème « Noir classique » reste disponible.
+- **HUD natifs volume & luminosité** : les touches du clavier affichent le HUD du notch à la place de celui de macOS, avec un curseur réglable à la souris (⌥⇧ = réglage fin). Nécessite l'autorisation Accessibilité.
+- **Rappels** : rappels à cocher depuis le notch, ajout rapide, et Live Activity quand un rappel arrive à échéance.
+- **Actions rapides** : verrouiller, veille de l'écran, capture, mode sombre, masquer le bureau, anti-veille, curseurs volume/luminosité et tes **Raccourcis** macOS.
+- **Raccourci global ⌥⌘N** pour ouvrir/fermer le notch.
+- **Paroles synchronisées** (LRCLIB) qui défilent avec la musique, **visualiseur** dans le lecteur.
+- **Lecteurs web** : YouTube, Deezer, SoundCloud, Spotify Web… dans Safari, Chrome, Brave et Edge (activer « Autoriser JavaScript depuis les Apple Events » dans le navigateur).
+
 ### Réglages
 Style **Notch** ou **Dynamic Island** (île flottante sur les écrans sans notch), taille d'ouverture, ouverture au survol + délai, haptique, lancement au démarrage, activation de chaque module, ville météo, °C / °F.
 

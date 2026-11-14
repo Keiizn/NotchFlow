@@ -20,9 +20,12 @@ struct NotchRootView: View {
             isOpen: vm.isOpen,
             earRadius: vm.earRadius,
             bottomRadius: vm.bottomRadius,
-            height: size.height
+            height: size.height,
+            notchHeight: vm.notchSize.height,
+            glass: settings.theme == .glass,
+            glassTint: settings.glassTint
         ))
-        .shadow(color: .black.opacity(vm.isOpen && settings.showShadow ? 0.45 : 0), radius: 18, y: 8)
+        .shadow(color: .black.opacity(vm.isOpen && settings.showShadow ? 0.4 : 0), radius: 22, y: 10)
         .padding(.top, vm.topOffset)
         .contentShape(Rectangle())
         .onTapGesture { if !vm.isOpen { vm.open() } }

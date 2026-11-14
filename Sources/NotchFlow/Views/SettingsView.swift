@@ -6,13 +6,15 @@ import ServiceManagement
 @MainActor
 struct SettingsView: View {
     enum Section: String, CaseIterable, Identifiable {
-        case general, appearance, activities, tabs, apps, widgets, about
+        case general, appearance, activities, controls, music, tabs, apps, widgets, about
         var id: String { rawValue }
         var title: String {
             switch self {
             case .general: "Général"
             case .appearance: "Apparence"
             case .activities: "Activités en direct"
+            case .controls: "Contrôles & raccourcis"
+            case .music: "Musique"
             case .tabs: "Onglets"
             case .apps: "Applications"
             case .widgets: "Agenda, météo & outils"
@@ -24,6 +26,8 @@ struct SettingsView: View {
             case .general: "gearshape.fill"
             case .appearance: "paintbrush.fill"
             case .activities: "waveform"
+            case .controls: "keyboard.fill"
+            case .music: "music.note"
             case .tabs: "square.grid.2x2.fill"
             case .apps: "app.badge.fill"
             case .widgets: "calendar"
@@ -35,6 +39,8 @@ struct SettingsView: View {
             case .general: .gray
             case .appearance: .purple
             case .activities: .pink
+            case .controls: .cyan
+            case .music: .red
             case .tabs: .blue
             case .apps: .indigo
             case .widgets: .orange
@@ -68,6 +74,8 @@ struct SettingsView: View {
                 case .general: GeneralSettings()
                 case .appearance: AppearanceSettings()
                 case .activities: ActivitiesSettings()
+                case .controls: ControlsSettings()
+                case .music: MusicSettings()
                 case .tabs: TabsSettings()
                 case .apps: AppsSettings()
                 case .widgets: WidgetsSettings()
@@ -161,6 +169,25 @@ private struct AppearanceSettings: View {
                 Text("« Dynamic Island » flotte sous le bord de l'écran sur les Mac sans notch.")
             }
 
+            Section {
+                Picker("Thème du notch ouvert", selection: $settings.theme) {
+                    ForEach(AppSettings.Theme.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                if settings.theme == .glass {
+                    LabeledContent("Opacité du verre") {
+                        HStack {
+                            Slider(value: $settings.glassTint, in: 0...0.7, step: 0.05)
+                            Text("\(Int(settings.glassTint * 100)) %").monospacedDigit().frame(width: 44, alignment: .trailing)
+                        }
+                    }
+                }
+            } header: {
+                Text("Matière")
+            } footer: {
+                Text("Liquid Glass : verre dépoli translucide dans l'esprit de macOS Tahoe. Le notch fermé reste noir pour se fondre dans le notch matériel.")
+            }
+
             Section("Taille du notch ouvert") {
                 LabeledContent("Largeur") {
                     HStack {
@@ -231,7 +258,8 @@ private struct ActivitiesSettings: View {
                 row("Musique en cours", "Pochette et égaliseur autour du notch", "music.note", .pink, $settings.showMusicActivity)
                 row("Réunion imminente", "« dans X min » 10 minutes avant un événement", "calendar.badge.clock", .red, $settings.showEventActivity)
                 row("Chargeur", "Animation au branchement / débranchement", "bolt.fill", .green, $settings.showBatteryActivity)
-                row("Volume", "HUD lors d'un changement de volume", "speaker.wave.2.fill", .blue, $settings.showVolumeHUD)
+                row("Volume & luminosité", "HUD avec curseur lors d'un changement", "speaker.wave.2.fill", .blue, $settings.showVolumeHUD)
+                row("Rappel à échéance", "Le titre du rappel s'affiche autour du notch", "checklist", .orange, $settings.showReminderActivity)
             } header: {
                 Text("Quand le notch est fermé")
             } footer: {
@@ -245,6 +273,94 @@ private struct ActivitiesSettings: View {
         Toggle(isOn: binding) {
             SettingsRowLabel(title: title, subtitle: subtitle, icon: icon, color: color)
         }
+    }
+}
+
+// MARK: - Contrôles & raccourcis
+
+@MainActor
+private struct ControlsSettings: View {
+    @EnvironmentObject private var settings: AppSettings
+    @ObservedObject private var keys = MediaKeyService.shared
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle(isOn: $settings.replaceSystemHUD) {
+                    SettingsRowLabel(title: "Remplacer les HUD de macOS",
+                                     subtitle: "Les touches volume et luminosité affichent le HUD du notch",
+                                     icon: "speaker.wave.3.fill", color: .blue)
+                }
+                .onChange(of: settings.replaceSystemHUD) { _, _ in MediaKeyService.shared.start() }
+
+                if settings.replaceSystemHUD {
+                    LabeledContent("Autorisation Accessibilité") {
+                        if keys.isActive {
+                            Label("Active", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                        } else {
+                            HStack {
+                                Button("Autoriser…") { keys.requestTrust() }
+                                Button("Réglages") { keys.openAccessibilitySettings() }
+                            }
+                        }
+                    }
+                }
+            } header: {
+                Text("Volume et luminosité")
+            } footer: {
+                Text("macOS demande l'autorisation « Accessibilité » pour intercepter ces touches. ⌥⇧ + touche = réglage fin. Après une mise à jour, il peut falloir réactiver NotchFlow dans Réglages Système → Confidentialité et sécurité → Accessibilité.")
+            }
+
+            Section {
+                Toggle(isOn: $settings.hotKeyEnabled) {
+                    SettingsRowLabel(title: "Raccourci global \(HotKeyService.displayString)",
+                                     subtitle: "Ouvre ou ferme le notch depuis n'importe quelle app",
+                                     icon: "command", color: .gray)
+                }
+                .onChange(of: settings.hotKeyEnabled) { _, _ in HotKeyService.shared.register() }
+            } header: {
+                Text("Raccourci clavier")
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+// MARK: - Musique
+
+@MainActor
+private struct MusicSettings: View {
+    @EnvironmentObject private var settings: AppSettings
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle(isOn: $settings.showLyrics) {
+                    SettingsRowLabel(title: "Paroles synchronisées",
+                                     subtitle: "Bouton « paroles » dans le lecteur (source : LRCLIB)",
+                                     icon: "quote.bubble.fill", color: .pink)
+                }
+            } header: {
+                Text("Lecteur")
+            }
+
+            Section {
+                Toggle(isOn: $settings.browserMedia) {
+                    SettingsRowLabel(title: "Lecteurs web",
+                                     subtitle: "YouTube, Deezer, SoundCloud, Spotify Web… dans Safari, Chrome, Brave, Edge",
+                                     icon: "globe", color: .blue)
+                }
+            } header: {
+                Text("Navigateurs")
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Pour que NotchFlow puisse lire et piloter la lecture, autorisez le JavaScript depuis les événements Apple :")
+                    Text("• Safari : Réglages → Avancées → « Afficher les fonctionnalités pour les développeurs Web », puis menu Développement → « Autoriser JavaScript depuis les Apple Events ».")
+                    Text("• Chrome / Brave / Edge : menu Affichage → Options pour les développeurs → « Autoriser JavaScript à partir des Apple Events ».")
+                }
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 

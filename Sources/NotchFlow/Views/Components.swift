@@ -33,22 +33,145 @@ struct ArtworkView: View {
 struct AudioBars: View {
     var color: Color
     var isPlaying: Bool
-    private let speeds: [Double] = [2.3, 3.1, 1.7, 2.8]
+    var count: Int = 4
+    var height: CGFloat = 16
+    var barWidth: CGFloat = 3
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 20, paused: !isPlaying)) { context in
+        TimelineView(.animation(minimumInterval: 1.0 / 24, paused: !isPlaying)) { context in
             let t = context.date.timeIntervalSinceReferenceDate
-            HStack(alignment: .center, spacing: 2.5) {
-                ForEach(0..<4, id: \.self) { i in
-                    let phase = t * speeds[i] + Double(i) * 1.3
-                    let level = isPlaying ? 0.25 + 0.75 * abs(sin(phase) * cos(phase * 0.6)) : 0.2
+            HStack(alignment: .center, spacing: barWidth * 0.8) {
+                ForEach(0..<count, id: \.self) { i in
+                    let speed = 1.7 + Double((i * 7) % 5) * 0.45
+                    let phase = t * speed + Double(i) * 1.3
+                    let level = isPlaying ? 0.22 + 0.78 * abs(sin(phase) * cos(phase * 0.6 + Double(i))) : 0.18
                     Capsule()
                         .fill(color.gradient)
-                        .frame(width: 3, height: max(3, 16 * level))
+                        .frame(width: barWidth, height: max(barWidth, height * level))
                 }
             }
         }
-        .frame(width: 22, height: 16)
+        .frame(height: height)
+    }
+}
+
+/// Curseur fin et déplaçable (HUD volume / luminosité, contrôles).
+@MainActor
+struct HUDSlider: View {
+    var value: Double
+    var color: Color = .white
+    var onChange: (Double) -> Void
+    @State private var dragValue: Double?
+
+    var body: some View {
+        GeometryReader { geo in
+            let shown = CGFloat(min(max(dragValue ?? value, 0), 1))
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.white.opacity(0.18))
+                Capsule()
+                    .fill(color)
+                    .frame(width: max(6, geo.size.width * shown))
+            }
+            .frame(height: dragValue != nil ? 8 : 6)
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { drag in
+                        let v = Double(min(max(drag.location.x / max(geo.size.width, 1), 0), 1))
+                        dragValue = v
+                        onChange(v)
+                    }
+                    .onEnded { _ in dragValue = nil }
+            )
+        }
+        .frame(height: 18)
+        .animation(.spring(response: 0.25, dampingFraction: 0.85), value: value)
+        .animation(.easeOut(duration: 0.12), value: dragValue != nil)
+    }
+}
+
+// MARK: - Liquid Glass
+
+/// Flou de ce qui se trouve derrière la fenêtre (fond d'écran, fenêtres).
+struct VisualEffectBackground: NSViewRepresentable {
+    var material: NSVisualEffectView.Material = .hudWindow
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = .behindWindow
+        view.state = .active
+        view.isEmphasized = true
+        view.appearance = NSAppearance(named: .darkAqua)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.material = material
+    }
+}
+
+/// Fond du notch : noir quand il est fermé (il prolonge le notch matériel),
+/// verre dépoli quand il est ouvert en thème Liquid Glass.
+@MainActor
+struct NotchSurface: View {
+    let glass: Bool
+    let tint: Double
+    let notchHeight: CGFloat
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            VisualEffectBackground()
+                .opacity(glass ? 1 : 0)
+            Color.black.opacity(glass ? tint : 1)
+            // Le haut reste noir pour se fondre dans le notch physique et la barre des menus.
+            LinearGradient(
+                colors: [.black, .black.opacity(0.85), .black.opacity(0)],
+                startPoint: .top, endPoint: .bottom
+            )
+            .frame(height: notchHeight + 26)
+            .opacity(glass ? 1 : 0)
+            // Reflet spéculaire
+            LinearGradient(
+                colors: [.white.opacity(0.10), .white.opacity(0.02), .clear],
+                startPoint: .topLeading, endPoint: .center
+            )
+            .opacity(glass ? 1 : 0)
+            .blendMode(.plusLighter)
+        }
+    }
+}
+
+/// Carte « widget » en verre : fond légèrement éclairé + liseré lumineux.
+struct GlassCard: ViewModifier {
+    var cornerRadius: CGFloat = 18
+    var padding: CGFloat = 10
+
+    func body(content: Content) -> some View {
+        content
+            .padding(padding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Color.white.opacity(0.07))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [.white.opacity(0.25), .white.opacity(0.05), .white.opacity(0.12)],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 0.8
+                    )
+            )
+    }
+}
+
+extension View {
+    func glassCard(cornerRadius: CGFloat = 18, padding: CGFloat = 10) -> some View {
+        modifier(GlassCard(cornerRadius: cornerRadius, padding: padding))
     }
 }
 

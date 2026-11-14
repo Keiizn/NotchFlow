@@ -1,16 +1,56 @@
 import AppKit
 import SwiftUI
 
-enum MediaSource: String {
-    case spotify, music
+enum MediaSource: String, CaseIterable {
+    case spotify, music, safari, chrome, brave, edge
 
-    var bundleID: String { self == .spotify ? "com.spotify.client" : "com.apple.Music" }
-    /// Nom AppleScript de l'application
-    var appName: String { self == .spotify ? "Spotify" : "Music" }
-    var displayName: String { self == .spotify ? "Spotify" : "Musique" }
-    var notificationName: String {
-        self == .spotify ? "com.spotify.client.PlaybackStateChanged" : "com.apple.Music.playerInfo"
+    static let native: [MediaSource] = [.spotify, .music]
+    static let browsers: [MediaSource] = [.safari, .chrome, .brave, .edge]
+
+    var isBrowser: Bool { Self.browsers.contains(self) }
+
+    var bundleID: String {
+        switch self {
+        case .spotify: "com.spotify.client"
+        case .music: "com.apple.Music"
+        case .safari: "com.apple.Safari"
+        case .chrome: "com.google.Chrome"
+        case .brave: "com.brave.Browser"
+        case .edge: "com.microsoft.edgemac"
+        }
     }
+
+    /// Nom AppleScript de l'application
+    var appName: String {
+        switch self {
+        case .spotify: "Spotify"
+        case .music: "Music"
+        case .safari: "Safari"
+        case .chrome: "Google Chrome"
+        case .brave: "Brave Browser"
+        case .edge: "Microsoft Edge"
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .spotify: "Spotify"
+        case .music: "Musique"
+        case .safari: "Safari"
+        case .chrome: "Chrome"
+        case .brave: "Brave"
+        case .edge: "Edge"
+        }
+    }
+
+    var notificationName: String? {
+        switch self {
+        case .spotify: "com.spotify.client.PlaybackStateChanged"
+        case .music: "com.apple.Music.playerInfo"
+        default: nil
+        }
+    }
+
     var isRunning: Bool {
         !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty
     }
@@ -24,7 +64,8 @@ struct Track: Equatable {
     var duration: Double   // secondes
 }
 
-/// Lit et pilote Spotify / Apple Music via leurs notifications distribuées et AppleScript.
+/// Lit et pilote Spotify / Apple Music (notifications + AppleScript) et les lecteurs
+/// web (YouTube, Deezer, SoundCloud…) de Safari, Chrome, Brave et Edge (JavaScript via AppleScript).
 @MainActor
 final class MediaController: ObservableObject {
     static let shared = MediaController()
@@ -40,11 +81,14 @@ final class MediaController: ObservableObject {
     private let scriptQueue = DispatchQueue(label: "app.notchflow.applescript", qos: .userInitiated)
     private var syncTimer: Timer?
     private var artworkKey: String?
+    private var browserArtworkURL: URL?
+    private var browserPollInFlight = false
 
     private init() {
         let center = DistributedNotificationCenter.default()
-        for src in [MediaSource.spotify, .music] {
-            center.addObserver(forName: Notification.Name(src.notificationName), object: nil, queue: .main) { [weak self] note in
+        for src in MediaSource.native {
+            guard let name = src.notificationName else { continue }
+            center.addObserver(forName: Notification.Name(name), object: nil, queue: .main) { [weak self] note in
                 let info = note.userInfo ?? [:]
                 MainActor.assumeIsolated { self?.handleNotification(info, from: src) }
             }
@@ -83,16 +127,37 @@ final class MediaController: ObservableObject {
 
     func playPause() {
         let current = currentPosition(at: Date())
-        send("playpause")
+        if let src = source, src.isBrowser {
+            sendBrowser(src, action: "if(m.paused){m.play()}else{m.pause()};")
+        } else {
+            send("playpause")
+        }
         isPlaying.toggle()
         setPosition(current)
     }
 
-    func next() { send("next track") }
-    func previous() { send("previous track") }
+    func next() {
+        if let src = source, src.isBrowser {
+            sendBrowser(src, action: "var b=document.querySelector('.ytp-next-button,ytmusic-player-bar .next-button,[data-testid=control-button-skip-forward],.skipControl__next,[data-testid=next-button],[aria-label=Next],[aria-label=Suivant]');if(b){b.click()}else{m.currentTime=m.duration};")
+        } else {
+            send("next track")
+        }
+    }
+
+    func previous() {
+        if let src = source, src.isBrowser {
+            sendBrowser(src, action: "var b=document.querySelector('.ytp-prev-button,ytmusic-player-bar .previous-button,[data-testid=control-button-skip-back],.skipControl__previous,[data-testid=previous-button],[aria-label=Previous],[aria-label=Précédent]');if(b&&m.currentTime<3){b.click()}else{m.currentTime=0};")
+        } else {
+            send("previous track")
+        }
+    }
 
     func seek(to seconds: Double) {
-        send("set player position to \(Int(seconds))")
+        if let src = source, src.isBrowser {
+            sendBrowser(src, action: "m.currentTime=\(Int(seconds));")
+        } else {
+            send("set player position to \(Int(seconds))")
+        }
         setPosition(seconds)
     }
 
@@ -108,13 +173,13 @@ final class MediaController: ObservableObject {
     }
 
     private func send(_ command: String) {
-        guard let src = source ?? [MediaSource.spotify, .music].first(where: { $0.isRunning }) else { return }
+        guard let src = source ?? MediaSource.native.first(where: { $0.isRunning }) else { return }
         run("tell application \"\(src.appName)\" to \(command)") { [weak self] _ in
             self?.fetchState(src)
         }
     }
 
-    // MARK: - Réception d'état
+    // MARK: - Réception d'état (Spotify / Musique)
 
     private func handleNotification(_ info: [AnyHashable: Any], from src: MediaSource) {
         let state = (info["Player State"] as? String) ?? ""
@@ -123,7 +188,6 @@ final class MediaController: ObservableObject {
             return
         }
         let playing = state == "Playing"
-        // Ne pas écraser une autre source qui est en train de jouer.
         if let current = source, current != src, isPlaying, !playing { return }
 
         let title = info["Name"] as? String ?? ""
@@ -161,27 +225,34 @@ final class MediaController: ObservableObject {
         source = nil
         artwork = nil
         artworkKey = nil
+        browserArtworkURL = nil
         accentColor = .white
     }
 
     private func periodicSync() {
-        if let src = source {
-            if isPlaying { fetchState(src) }
-        } else {
+        let browsersEnabled = AppSettings.shared.browserMedia
+        if let src = source, !src.isBrowser {
+            if isPlaying { fetchState(src) } else if browsersEnabled { pollBrowsers() }
+        } else if source == nil {
             refreshFromRunningApps()
+            if browsersEnabled { pollBrowsers() }
+        } else if browsersEnabled {
+            pollBrowsers()
+        } else {
+            clear()
         }
     }
 
     private func refreshFromRunningApps() {
-        for src in [MediaSource.spotify, .music] where src.isRunning {
+        for src in MediaSource.native where src.isRunning {
             fetchState(src)
         }
     }
 
-    /// Interroge l'app via AppleScript. Les nombres sont renvoyés en millisecondes entières
-    /// pour éviter les problèmes de séparateur décimal selon la langue du système.
+    /// Les nombres sont renvoyés en millisecondes entières pour éviter les problèmes
+    /// de séparateur décimal selon la langue du système.
     private func fetchState(_ src: MediaSource) {
-        guard src.isRunning else { return }
+        guard src.isRunning, !src.isBrowser else { return }
         run(Self.stateScript(for: src)) { [weak self] result in
             guard let self, let text = result?.stringValue else { return }
             if text == "stopped" {
@@ -219,6 +290,101 @@ final class MediaController: ObservableObject {
         """
     }
 
+    // MARK: - Lecteurs web (navigateurs)
+
+    /// Trouve l'élément <video>/<audio> qui joue (ou a déjà joué) dans la page.
+    private static let mediaFinder = "var ms=Array.prototype.slice.call(document.querySelectorAll('video,audio'));var m=ms.find(function(e){return !e.paused&&e.duration>0})||ms.find(function(e){return e.duration>0&&e.currentTime>0});"
+
+    private static let browserInfoJS = "(function(){" + mediaFinder +
+        "if(!m){return ''}var md=navigator.mediaSession?navigator.mediaSession.metadata:null;var art='';" +
+        "if(md&&md.artwork&&md.artwork.length){art=md.artwork[md.artwork.length-1].src}" +
+        "return JSON.stringify({t:(md&&md.title)||document.title,a:(md&&md.artist)||location.hostname,al:(md&&md.album)||'',art:art,p:!m.paused,d:isFinite(m.duration)?m.duration:0,c:m.currentTime})})()"
+
+    private static func browserActionJS(_ action: String) -> String {
+        "(function(){" + mediaFinder + "if(!m){return ''}" + action + "return 'ok'})()"
+    }
+
+    private static let mediaDomains = [
+        "youtube.com", "deezer.com", "soundcloud.com", "open.spotify.com", "music.apple.com",
+        "twitch.tv", "vimeo.com", "bandcamp.com", "tidal.com", "qobuz.com", "mixcloud.com", "radiofrance.fr",
+    ]
+
+    private static func browserScript(_ src: MediaSource, js: String) -> String {
+        let condition = mediaDomains.map { "u contains \"\($0)\"" }.joined(separator: " or ")
+        let exec = src == .safari ? "do JavaScript \"\(js)\" in t" : "execute t javascript \"\(js)\""
+        return """
+        try
+            tell application "\(src.appName)"
+                repeat with w in windows
+                    repeat with t in tabs of w
+                        set u to URL of t
+                        if u is not missing value and (\(condition)) then
+                            set r to \(exec)
+                            if r is not missing value and r is not "" then return r
+                        end if
+                    end repeat
+                end repeat
+            end tell
+        end try
+        return ""
+        """
+    }
+
+    private func pollBrowsers() {
+        guard AppSettings.shared.browserMedia, !browserPollInFlight else { return }
+        let running = MediaSource.browsers.filter(\.isRunning)
+        guard !running.isEmpty else {
+            if source?.isBrowser == true { clear() }
+            return
+        }
+        browserPollInFlight = true
+        pollBrowser(in: running, at: 0)
+    }
+
+    private func pollBrowser(in list: [MediaSource], at index: Int) {
+        guard index < list.count else {
+            browserPollInFlight = false
+            if source?.isBrowser == true { clear() }   // plus aucun lecteur web
+            return
+        }
+        let src = list[index]
+        run(Self.browserScript(src, js: Self.browserInfoJS)) { [weak self] result in
+            guard let self else { return }
+            if let text = result?.stringValue, !text.isEmpty, self.handleBrowserResult(text, from: src) {
+                self.browserPollInFlight = false
+            } else {
+                self.pollBrowser(in: list, at: index + 1)
+            }
+        }
+    }
+
+    private func handleBrowserResult(_ text: String, from src: MediaSource) -> Bool {
+        guard let data = text.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let title = object["t"] as? String else { return false }
+        // Une source native qui joue garde la priorité.
+        if let current = source, !current.isBrowser, isPlaying { return true }
+
+        let artist = object["a"] as? String ?? ""
+        let album = object["al"] as? String ?? ""
+        let playing = object["p"] as? Bool ?? false
+        let duration = (object["d"] as? NSNumber)?.doubleValue ?? 0
+        let position = (object["c"] as? NSNumber)?.doubleValue ?? 0
+        browserArtworkURL = (object["art"] as? String).flatMap { URL(string: $0) }
+
+        let newTrack = Track(id: "\(src.rawValue)|\(title)|\(artist)", title: title, artist: artist, album: album, duration: duration)
+        apply(source: src, track: newTrack, playing: playing)
+        setPosition(position)
+        return true
+    }
+
+    private func sendBrowser(_ src: MediaSource, action: String) {
+        run(Self.browserScript(src, js: Self.browserActionJS(action))) { [weak self] _ in
+            self?.browserPollInFlight = false
+            self?.pollBrowsers()
+        }
+    }
+
     // MARK: - Pochette
 
     private func fetchArtwork(_ src: MediaSource, key: String) {
@@ -226,11 +392,7 @@ final class MediaController: ObservableObject {
         case .spotify:
             run("tell application \"Spotify\" to return artwork url of current track") { [weak self] result in
                 guard let string = result?.stringValue, let url = URL(string: string) else { return }
-                Task { [weak self] in
-                    guard let response = try? await URLSession.shared.data(from: url),
-                          let image = NSImage(data: response.0) else { return }
-                    self?.setArtwork(image, key: key)
-                }
+                self?.downloadArtwork(url, key: key)
             }
         case .music:
             run("tell application \"Music\" to get raw data of artwork 1 of current track") { [weak self] result in
@@ -240,6 +402,20 @@ final class MediaController: ObservableObject {
                 }
                 self?.setArtwork(image, key: key)
             }
+        default:
+            if let url = browserArtworkURL {
+                downloadArtwork(url, key: key)
+            } else {
+                setArtwork(nil, key: key)
+            }
+        }
+    }
+
+    private func downloadArtwork(_ url: URL, key: String) {
+        Task { [weak self] in
+            guard let response = try? await URLSession.shared.data(from: url),
+                  let image = NSImage(data: response.0) else { return }
+            self?.setArtwork(image, key: key)
         }
     }
 

@@ -27,6 +27,8 @@ struct OpenNotchView: View {
         case .apps: AppsView()
         case .shelf: ShelfView()
         case .timer: TimerView()
+        case .reminders: RemindersView()
+        case .actions: ActionsView()
         case .notes: NotesView()
         case .clipboard: ClipboardView()
         case .system: SystemView()
@@ -47,16 +49,22 @@ struct HeaderBar: View {
         let tabs = vm.visibleTabs
         let split = (tabs.count + 1) / 2
         HStack(spacing: 0) {
-            HStack(spacing: 2) {
+            HStack(spacing: 0) {
                 ForEach(tabs.prefix(split)) { tabButton($0) }
             }
+            .padding(2)
+            .background(tabPill)
             .frame(maxWidth: .infinity, alignment: .leading)
 
             // Zone masquée par le notch physique
             Color.clear.frame(width: vm.notchSize.width)
 
             HStack(spacing: 2) {
-                ForEach(tabs.dropFirst(split)) { tabButton($0) }
+                HStack(spacing: 0) {
+                    ForEach(tabs.dropFirst(split)) { tabButton($0) }
+                }
+                .padding(2)
+                .background(tabPill)
                 Spacer(minLength: 6)
                 if battery.hasBattery && settings.showBatteryInHeader {
                     BatteryBadge().padding(.trailing, 8)
@@ -76,13 +84,23 @@ struct HeaderBar: View {
         }
     }
 
+    /// Pilule en verre derrière les onglets (thème Liquid Glass).
+    @ViewBuilder
+    private var tabPill: some View {
+        if settings.theme == .glass {
+            Capsule()
+                .fill(Color.white.opacity(0.06))
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.6))
+        }
+    }
+
     private func tabButton(_ tab: NotchViewModel.Tab) -> some View {
         Button {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.tab = tab }
         } label: {
             Image(systemName: tab.icon)
-                .font(.system(size: 11.5, weight: .semibold))
-                .frame(width: 28, height: 22)
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 27, height: 22)
                 .foregroundStyle(vm.tab == tab ? Color.white : Color.white.opacity(0.45))
                 .background {
                     if vm.tab == tab {

@@ -34,13 +34,36 @@ final class AppSettings: ObservableObject {
         static let showBatteryInHeader = "showBatteryInHeader"
         static let autoCheckUpdates = "autoCheckUpdates"
         static let autoInstallUpdates = "autoInstallUpdates"
+        static let theme = "theme"
+        static let glassTint = "glassTint"
+        static let replaceSystemHUD = "replaceSystemHUD"
+        static let hotKeyEnabled = "hotKeyEnabled"
+        static let showLyrics = "showLyrics"
+        static let browserMedia = "browserMedia"
+        static let showReminderActivity = "showReminderActivity"
+        static let tabsMigration = "tabsMigrationV2"
     }
+
+    enum Theme: String, CaseIterable, Identifiable {
+        case glass, black
+        var id: String { rawValue }
+        var title: String { self == .glass ? "Liquid Glass" : "Noir classique" }
+    }
+
+    @Published var theme: Theme { didSet { store(theme.rawValue, Keys.theme) } }
+    /// Assombrissement du verre (0 = très transparent, 0,6 = presque opaque).
+    @Published var glassTint: Double { didSet { store(glassTint, Keys.glassTint) } }
+    @Published var replaceSystemHUD: Bool { didSet { store(replaceSystemHUD, Keys.replaceSystemHUD) } }
+    @Published var hotKeyEnabled: Bool { didSet { store(hotKeyEnabled, Keys.hotKeyEnabled) } }
+    @Published var showLyrics: Bool { didSet { store(showLyrics, Keys.showLyrics) } }
+    @Published var browserMedia: Bool { didSet { store(browserMedia, Keys.browserMedia) } }
+    @Published var showReminderActivity: Bool { didSet { store(showReminderActivity, Keys.showReminderActivity) } }
 
     @Published var autoCheckUpdates: Bool { didSet { store(autoCheckUpdates, Keys.autoCheckUpdates) } }
     @Published var autoInstallUpdates: Bool { didSet { store(autoInstallUpdates, Keys.autoInstallUpdates) } }
 
     /// Onglets activés par défaut (le miroir est désactivé par défaut).
-    static let defaultTabs = ["home", "apps", "shelf", "timer", "notes", "clipboard", "system"]
+    static let defaultTabs = ["home", "apps", "shelf", "timer", "reminders", "actions", "notes", "clipboard", "system"]
 
     @Published var enabledTabs: [String] { didSet { store(enabledTabs, Keys.enabledTabs) } }
     @Published var favoriteApps: [String] { didSet { store(favoriteApps, Keys.favoriteApps) } }
@@ -110,7 +133,14 @@ final class AppSettings: ObservableObject {
             Keys.openOnHover: true,
             Keys.hoverDelay: 0.15,
             Keys.haptics: true,
-            Keys.openWidth: 680.0,
+            Keys.openWidth: 720.0,
+            Keys.theme: Theme.glass.rawValue,
+            Keys.glassTint: 0.3,
+            Keys.replaceSystemHUD: true,
+            Keys.hotKeyEnabled: true,
+            Keys.showLyrics: true,
+            Keys.browserMedia: true,
+            Keys.showReminderActivity: true,
             Keys.enabledTabs: Self.defaultTabs,
             Keys.closeOnClickOutside: true,
             Keys.showShadow: true,
@@ -152,6 +182,22 @@ final class AppSettings: ObservableObject {
         showBatteryInHeader = d.bool(forKey: Keys.showBatteryInHeader)
         autoCheckUpdates = d.bool(forKey: Keys.autoCheckUpdates)
         autoInstallUpdates = d.bool(forKey: Keys.autoInstallUpdates)
+        theme = Theme(rawValue: d.string(forKey: Keys.theme) ?? "") ?? .glass
+        glassTint = d.double(forKey: Keys.glassTint)
+        replaceSystemHUD = d.bool(forKey: Keys.replaceSystemHUD)
+        hotKeyEnabled = d.bool(forKey: Keys.hotKeyEnabled)
+        showLyrics = d.bool(forKey: Keys.showLyrics)
+        browserMedia = d.bool(forKey: Keys.browserMedia)
+        showReminderActivity = d.bool(forKey: Keys.showReminderActivity)
+
+        // Ajoute une seule fois les nouveaux onglets (Rappels, Actions) aux listes déjà personnalisées.
+        if !d.bool(forKey: Keys.tabsMigration) {
+            for tab in ["reminders", "actions"] where !enabledTabs.contains(tab) {
+                enabledTabs.append(tab)
+            }
+            d.set(enabledTabs, forKey: Keys.enabledTabs)
+            d.set(true, forKey: Keys.tabsMigration)
+        }
     }
 
     private func store(_ value: Any, _ key: String) {

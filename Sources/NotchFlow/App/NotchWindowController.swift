@@ -97,6 +97,13 @@ final class NotchWindowController {
             vm.showHUD(.update(version), duration: 3)
         }
         UpdateChecker.shared.start()
+
+        // Raccourci global ⌥⌘N
+        HotKeyService.shared.onPress = { [weak self] in self?.viewModel.toggle() }
+        HotKeyService.shared.register()
+
+        // Touches volume / luminosité → HUD du notch
+        MediaKeyService.shared.start()
     }
 
     /// Place la fenêtre en haut au centre de l'écran qui possède un notch (ou l'écran principal).

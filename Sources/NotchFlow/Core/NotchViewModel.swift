@@ -8,7 +8,7 @@ final class NotchViewModel: ObservableObject {
     enum State { case closed, open }
 
     enum Tab: String, CaseIterable, Identifiable {
-        case home, apps, shelf, timer, notes, clipboard, system, mirror
+        case home, apps, shelf, timer, reminders, actions, notes, clipboard, system, mirror
         var id: String { rawValue }
         var icon: String {
             switch self {
@@ -16,6 +16,8 @@ final class NotchViewModel: ObservableObject {
             case .apps: "square.grid.3x3.fill"
             case .shelf: "tray.full.fill"
             case .timer: "timer"
+            case .reminders: "checklist"
+            case .actions: "bolt.fill"
             case .notes: "note.text"
             case .clipboard: "doc.on.clipboard.fill"
             case .system: "cpu"
@@ -28,6 +30,8 @@ final class NotchViewModel: ObservableObject {
             case .apps: "Applications"
             case .shelf: "Étagère"
             case .timer: "Minuteur"
+            case .reminders: "Rappels"
+            case .actions: "Actions rapides"
             case .notes: "Notes rapides"
             case .clipboard: "Presse-papiers"
             case .system: "Système"
@@ -40,6 +44,8 @@ final class NotchViewModel: ObservableObject {
             case .apps: "Lanceur d'apps favorites et apps ouvertes"
             case .shelf: "Déposez des fichiers, partagez-les par AirDrop"
             case .timer: "Minuteur et Pomodoro"
+            case .reminders: "Rappels du jour, à cocher depuis le notch"
+            case .actions: "Verrouiller, mode sombre, anti-veille, Raccourcis…"
             case .notes: "Bloc-notes toujours sous la main"
             case .clipboard: "Historique des textes copiés"
             case .system: "Processeur, mémoire, disque, batterie"
@@ -61,7 +67,12 @@ final class NotchViewModel: ObservableObject {
         case unplugged(Int)
         case timerDone
         case update(String)        // nouvelle version en cours d'installation
+        case brightness(Float)
+        case reminder(String)
     }
+
+    /// Affiche les paroles à la place de l'agenda sur l'accueil.
+    @Published var showLyrics = false
 
     /// Ce que le notch fermé affiche (« Live Activity »).
     enum Activity: Equatable {
@@ -128,6 +139,26 @@ final class NotchViewModel: ObservableObject {
         timer.finished
             .sink { [weak self] in self?.showHUD(.timerDone, duration: 4) }
             .store(in: &cancellables)
+
+        BrightnessService.shared.changes
+            .sink { [weak self] in
+                guard let self, self.settings.showVolumeHUD else { return }
+                self.showHUD(.brightness(BrightnessService.shared.brightness))
+            }
+            .store(in: &cancellables)
+
+        RemindersService.shared.dueEvents
+            .sink { [weak self] title in
+                guard let self, self.settings.showReminderActivity else { return }
+                self.showHUD(.reminder(title), duration: 6)
+            }
+            .store(in: &cancellables)
+
+        // Paroles du morceau en cours
+        media.$track
+            .removeDuplicates()
+            .sink { LyricsService.shared.load(for: $0) }
+            .store(in: &cancellables)
     }
 
     // MARK: - Écran
@@ -154,6 +185,7 @@ final class NotchViewModel: ObservableObject {
         case .music: notchSize.height + 4
         case .timer: 62
         case .event: 74
+        case .hud(.reminder): 130
         case .hud: 86
         }
     }
@@ -207,7 +239,7 @@ final class NotchViewModel: ObservableObject {
                 if !isHovering { isHovering = true }
                 if dragging {
                     if dragContainsFiles() { open(tab: .shelf) }
-                } else if settings.openOnHover {
+                } else if settings.openOnHover && !isInteractiveHUD {
                     scheduleOpen()
                 }
             } else {
@@ -296,6 +328,14 @@ final class NotchViewModel: ObservableObject {
     func toggle() { isOpen ? close() : open() }
 
     // MARK: - HUD
+
+    /// HUD avec curseur affiché : le survol ne doit pas ouvrir le notch.
+    private var isInteractiveHUD: Bool {
+        switch hud {
+        case .some(.volume), .some(.brightness): true
+        default: false
+        }
+    }
 
     func showHUD(_ kind: HUD, duration: Double = 1.8) {
         guard state == .closed else { return }

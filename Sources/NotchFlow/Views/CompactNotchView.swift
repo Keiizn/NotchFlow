@@ -108,6 +108,16 @@ struct CompactNotchView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.blue)
                 .symbolEffect(.pulse)
+        case .brightness(let level):
+            Image(systemName: level < 0.35 ? "sun.min.fill" : "sun.max.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.yellow)
+                .contentTransition(.symbolEffect(.replace))
+        case .reminder:
+            Image(systemName: "checklist")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.orange)
+                .symbolEffect(.bounce, value: kind)
         }
     }
 
@@ -115,8 +125,19 @@ struct CompactNotchView: View {
     private func hudTrailing(_ kind: NotchViewModel.HUD) -> some View {
         switch kind {
         case .volume(let level, let muted):
-            LevelBar(value: muted ? 0 : Double(level), color: .white)
-                .frame(width: 54, height: 5)
+            // Curseur réglable directement à la souris
+            HUDSlider(value: muted ? 0 : Double(level)) { VolumeService.shared.setVolume(Float($0)) }
+                .frame(width: 60)
+        case .brightness(let level):
+            HUDSlider(value: Double(level), color: .yellow) { BrightnessService.shared.set(Float($0)) }
+                .frame(width: 60)
+        case .reminder(let title):
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .padding(.horizontal, 4)
         case .charging(let level):
             HStack(spacing: 4) {
                 Text("\(level)%").font(.system(size: 12, weight: .semibold)).monospacedDigit()

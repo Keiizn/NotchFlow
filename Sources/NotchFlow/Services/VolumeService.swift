@@ -99,6 +99,46 @@ final class VolumeService: ObservableObject {
         if notify && changed { changes.send() }
     }
 
+    // MARK: - Réglage
+
+    func setVolume(_ newValue: Float) {
+        var value = Float32(min(max(newValue, 0), 1))
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwareServiceDeviceProperty_VirtualMainVolume,
+            mScope: kAudioDevicePropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        if AudioHardwareServiceHasProperty(deviceID, &address) {
+            AudioHardwareServiceSetPropertyData(deviceID, &address, 0, nil, UInt32(MemoryLayout<Float32>.size), &value)
+        } else {
+            for element in [kAudioObjectPropertyElementMain, 1, 2] as [AudioObjectPropertyElement] {
+                var channel = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyVolumeScalar, mScope: kAudioDevicePropertyScopeOutput, mElement: element)
+                if AudioObjectHasProperty(deviceID, &channel) {
+                    AudioObjectSetPropertyData(deviceID, &channel, 0, nil, UInt32(MemoryLayout<Float32>.size), &value)
+                }
+            }
+        }
+        if value > 0 && isMuted { setMuted(false) }
+        read(notify: true)
+    }
+
+    func setMuted(_ muted: Bool) {
+        var flag: UInt32 = muted ? 1 : 0
+        var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyMute, mScope: kAudioDevicePropertyScopeOutput, mElement: kAudioObjectPropertyElementMain)
+        if AudioObjectHasProperty(deviceID, &address) {
+            AudioObjectSetPropertyData(deviceID, &address, 0, nil, UInt32(MemoryLayout<UInt32>.size), &flag)
+        }
+        read(notify: true)
+    }
+
+    func toggleMute() { setMuted(!isMuted) }
+
+    /// Pas de 1/16 (comme macOS), 1/64 avec ⌥⇧.
+    func step(by delta: Float) {
+        if isMuted && delta > 0 { setMuted(false) }
+        setVolume(volume + delta)
+    }
+
     private func scalar(element: AudioObjectPropertyElement) -> Float32? {
         var value = Float32(0)
         var size = UInt32(MemoryLayout<Float32>.size)

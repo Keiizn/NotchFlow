@@ -30,6 +30,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = TimerService.shared
         _ = AppLauncher.shared
         _ = NotesStore.shared
+        _ = BrightnessService.shared
+        _ = RemindersService.shared
+        _ = QuickActions.shared
         WeatherService.shared.start()
 
         setupStatusItem()

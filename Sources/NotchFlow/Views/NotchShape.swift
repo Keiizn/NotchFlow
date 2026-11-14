@@ -51,18 +51,39 @@ struct NotchBackground: ViewModifier {
     let earRadius: CGFloat
     let bottomRadius: CGFloat
     let height: CGFloat
+    var notchHeight: CGFloat = 32
+    var glass: Bool = false
+    var glassTint: Double = 0.3
 
     @ViewBuilder
     func body(content: Content) -> some View {
         switch style {
         case .notch:
-            content
-                .background(Color.black)
-                .clipShape(NotchShape(topRadius: earRadius, bottomRadius: bottomRadius))
+            decorate(content, shape: NotchShape(topRadius: earRadius, bottomRadius: bottomRadius))
         case .island:
-            content
-                .background(Color.black)
-                .clipShape(RoundedRectangle(cornerRadius: isOpen ? 32 : height / 2, style: .continuous))
+            decorate(content, shape: RoundedRectangle(cornerRadius: isOpen ? 32 : height / 2, style: .continuous))
         }
+    }
+
+    private func decorate<S: Shape>(_ content: Content, shape: S) -> some View {
+        let glassOn = glass && isOpen
+        return content
+            .background {
+                NotchSurface(glass: glassOn, tint: glassTint, notchHeight: notchHeight)
+            }
+            .clipShape(shape)
+            .overlay {
+                // Liseré lumineux du verre (plus marqué en bas, là où la lumière « accroche »)
+                shape
+                    .stroke(
+                        LinearGradient(
+                            colors: [.white.opacity(0), .white.opacity(0.18), .white.opacity(0.35)],
+                            startPoint: .top, endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+                    .opacity(glassOn ? 1 : 0)
+                    .allowsHitTesting(false)
+            }
     }
 }
