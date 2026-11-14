@@ -8,8 +8,8 @@ CONFIG="${1:-release}"
 APP="build/NotchFlow.app"
 
 echo "▸ Compilation (${CONFIG})…"
-swift build -c "$CONFIG"
-BIN_DIR="$(swift build -c "$CONFIG" --show-bin-path)"
+swift build -c "$CONFIG" --arch arm64 --arch x86_64
+BIN_DIR="$(swift build -c "$CONFIG" --arch arm64 --arch x86_64 --show-bin-path)"
 
 echo "▸ Assemblage de ${APP}…"
 rm -rf "${APP}"
@@ -26,5 +26,6 @@ codesign --force --deep --options runtime \
   --entitlements Support/NotchFlow.entitlements \
   --sign - "${APP}"
 
+lipo -info "${APP}/Contents/MacOS/NotchFlow"
 echo "✓ Terminé : ${APP}"
 echo "  Lancer : open \"${APP}\""
