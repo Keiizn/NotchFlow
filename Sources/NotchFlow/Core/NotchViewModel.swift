@@ -176,8 +176,10 @@ final class NotchViewModel: ObservableObject {
         )
     }
 
-    /// Ressort unique utilisé pour toutes les transitions de forme : rapide, sans rebond excessif.
-    static let shapeSpring = Animation.spring(response: 0.38, dampingFraction: 0.86)
+    /// Ouverture : ressort vif avec un tout petit dépassement, comme la Dynamic Island.
+    static let openSpring = Animation.spring(response: 0.42, dampingFraction: 0.8)
+    /// Fermeture / survol / activités : plus amorti, sans rebond.
+    static let closeSpring = Animation.spring(response: 0.34, dampingFraction: 0.95)
 
     var openSize: CGSize {
         CGSize(width: CGFloat(settings.openWidth), height: notchSize.height + CGFloat(settings.openHeight))
@@ -272,7 +274,7 @@ final class NotchViewModel: ObservableObject {
         guard state != .open else { return }
         hasEnteredOpenZone = screenRect(for: openSize).insetBy(dx: -16, dy: -16).contains(NSEvent.mouseLocation)
         hudTask?.cancel()
-        withAnimation(Self.shapeSpring) {
+        withAnimation(Self.openSpring) {
             hud = nil
             state = .open
         }
@@ -284,7 +286,7 @@ final class NotchViewModel: ObservableObject {
     func close() {
         cancelClose()
         guard state == .open else { return }
-        withAnimation(.spring(response: 0.36, dampingFraction: 0.92)) {
+        withAnimation(Self.closeSpring) {
             state = .closed
             isHovering = false
         }

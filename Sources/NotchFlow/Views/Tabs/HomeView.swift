@@ -36,7 +36,6 @@ struct MediaPlayerView: View {
         if let track = media.track {
             HStack(spacing: 12) {
                 ArtworkView(image: media.artwork, cornerRadius: 14)
-                    .matchedGeometryEffect(id: "artwork", in: ns)
                     .frame(width: 86, height: 86)
                     .shadow(color: media.accentColor.opacity(0.45), radius: 14)
                     .scaleEffect(media.isPlaying ? 1 : 0.92)

@@ -36,7 +36,6 @@ struct CompactNotchView: View {
             EmptyView()
         case .music:
             ArtworkView(image: media.artwork, cornerRadius: 6)
-                .matchedGeometryEffect(id: "artwork", in: ns)
                 .frame(width: vm.notchSize.height - 10, height: vm.notchSize.height - 10)
                 .transition(.scale.combined(with: .opacity))
         case .timer:

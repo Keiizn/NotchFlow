@@ -10,25 +10,28 @@ struct NotchRootView: View {
     var body: some View {
         let size = vm.shapeSize
         ZStack(alignment: .top) {
+            // Le contenu est disposé à sa taille FINALE (il ne se tasse jamais pendant
+            // l'animation) : c'est la forme noire qui le révèle en s'agrandissant.
             content
-                .frame(width: size.width, height: size.height, alignment: .top)
-                .modifier(NotchBackground(
-                    style: settings.style,
-                    isOpen: vm.isOpen,
-                    earRadius: vm.earRadius,
-                    bottomRadius: vm.bottomRadius,
-                    height: size.height
-                ))
-                .shadow(color: .black.opacity(vm.isOpen && settings.showShadow ? 0.5 : 0), radius: 16, y: 6)
-                .padding(.top, vm.topOffset)
-                .onTapGesture { if !vm.isOpen { vm.open() } }
-                .onDrop(of: [UTType.fileURL], isTargeted: $vm.isDropTargeted) { providers in
-                    vm.handleDrop(providers)
-                }
+        }
+        .frame(width: size.width, height: size.height, alignment: .top)
+        .modifier(NotchBackground(
+            style: settings.style,
+            isOpen: vm.isOpen,
+            earRadius: vm.earRadius,
+            bottomRadius: vm.bottomRadius,
+            height: size.height
+        ))
+        .shadow(color: .black.opacity(vm.isOpen && settings.showShadow ? 0.45 : 0), radius: 18, y: 8)
+        .padding(.top, vm.topOffset)
+        .contentShape(Rectangle())
+        .onTapGesture { if !vm.isOpen { vm.open() } }
+        .onDrop(of: [UTType.fileURL], isTargeted: $vm.isDropTargeted) { providers in
+            vm.handleDrop(providers)
         }
         .frame(width: vm.windowSize.width, height: vm.windowSize.height, alignment: .top)
         .ignoresSafeArea()
-        .animation(NotchViewModel.shapeSpring, value: size)
+        .animation(vm.isOpen ? NotchViewModel.openSpring : NotchViewModel.closeSpring, value: size)
         .environment(\.colorScheme, .dark)
         .onChange(of: vm.isDropTargeted) { _, targeted in
             if targeted { vm.open(tab: .shelf) }
@@ -39,15 +42,35 @@ struct NotchRootView: View {
     private var content: some View {
         if vm.isOpen {
             OpenNotchView(ns: ns)
+                .frame(width: vm.openSize.width, height: vm.openSize.height, alignment: .top)
                 .transition(.asymmetric(
-                    insertion: .opacity
-                        .combined(with: .scale(scale: 0.97, anchor: .top))
-                        .animation(.easeOut(duration: 0.22).delay(0.08)),
-                    removal: .opacity.animation(.easeOut(duration: 0.1))
+                    insertion: .modifier(
+                        active: RevealEffect(progress: 0),
+                        identity: RevealEffect(progress: 1)
+                    )
+                    .animation(.easeOut(duration: 0.28).delay(0.06)),
+                    removal: .opacity.animation(.easeIn(duration: 0.08))
                 ))
         } else {
             CompactNotchView(ns: ns)
-                .transition(.opacity)
+                .frame(width: vm.closedSize.width, height: vm.closedSize.height, alignment: .top)
+                .transition(.asymmetric(
+                    insertion: .opacity.animation(.easeOut(duration: 0.2).delay(0.12)),
+                    removal: .opacity.animation(.easeIn(duration: 0.06))
+                ))
         }
+    }
+}
+
+/// Apparition du contenu : fondu + flou qui se dissipe + léger glissement depuis le notch.
+private struct RevealEffect: ViewModifier {
+    var progress: Double
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(progress)
+            .blur(radius: (1 - progress) * 10)
+            .scaleEffect(0.96 + 0.04 * progress, anchor: .top)
+            .offset(y: (1 - progress) * -8)
     }
 }
