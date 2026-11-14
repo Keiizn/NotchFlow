@@ -245,7 +245,7 @@ private struct CurrencyConverterView: View {
                     Image(systemName: "arrow.clockwise").font(.system(size: 8, weight: .bold))
                 }
                 .buttonStyle(PressableButtonStyle())
-                .help(service.formattedDate.map { "Taux BCE du \($0) — actualiser" } ?? "Actualiser les taux")
+                .help(service.formattedDate.map { "Taux du \($0) — actualiser" } ?? "Actualiser les taux")
             }
             .font(.system(size: 9))
             .foregroundStyle(.secondary)

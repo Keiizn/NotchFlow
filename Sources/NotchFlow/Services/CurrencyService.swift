@@ -1,6 +1,6 @@
 import Foundation
 
-/// Taux de change (Banque centrale européenne via Frankfurter, sans clé API),
+/// Taux de change (open.er-api.com, 160 devises, sans clé API ; repli sur la BCE via Frankfurter),
 /// mis en cache une heure et conservés hors ligne.
 @MainActor
 final class CurrencyService: ObservableObject {
@@ -45,6 +45,34 @@ final class CurrencyService: ObservableObject {
         .init(code: "ZAR", flag: "🇿🇦", name: "Rand sud-africain"),
         .init(code: "BRL", flag: "🇧🇷", name: "Réal brésilien"),
         .init(code: "MXN", flag: "🇲🇽", name: "Peso mexicain"),
+        .init(code: "AED", flag: "🇦🇪", name: "Dirham des Émirats"),
+        .init(code: "SAR", flag: "🇸🇦", name: "Riyal saoudien"),
+        .init(code: "QAR", flag: "🇶🇦", name: "Riyal qatari"),
+        .init(code: "KWD", flag: "🇰🇼", name: "Dinar koweïtien"),
+        .init(code: "BHD", flag: "🇧🇭", name: "Dinar bahreïni"),
+        .init(code: "OMR", flag: "🇴🇲", name: "Rial omanais"),
+        .init(code: "JOD", flag: "🇯🇴", name: "Dinar jordanien"),
+        .init(code: "EGP", flag: "🇪🇬", name: "Livre égyptienne"),
+        .init(code: "MAD", flag: "🇲🇦", name: "Dirham marocain"),
+        .init(code: "TND", flag: "🇹🇳", name: "Dinar tunisien"),
+        .init(code: "DZD", flag: "🇩🇿", name: "Dinar algérien"),
+        .init(code: "XOF", flag: "🌍", name: "Franc CFA (UEMOA)"),
+        .init(code: "XAF", flag: "🌍", name: "Franc CFA (CEMAC)"),
+        .init(code: "NGN", flag: "🇳🇬", name: "Naira nigérian"),
+        .init(code: "KES", flag: "🇰🇪", name: "Shilling kényan"),
+        .init(code: "RUB", flag: "🇷🇺", name: "Rouble russe"),
+        .init(code: "UAH", flag: "🇺🇦", name: "Hryvnia ukrainienne"),
+        .init(code: "RSD", flag: "🇷🇸", name: "Dinar serbe"),
+        .init(code: "PKR", flag: "🇵🇰", name: "Roupie pakistanaise"),
+        .init(code: "BDT", flag: "🇧🇩", name: "Taka bangladais"),
+        .init(code: "LKR", flag: "🇱🇰", name: "Roupie srilankaise"),
+        .init(code: "VND", flag: "🇻🇳", name: "Dong vietnamien"),
+        .init(code: "TWD", flag: "🇹🇼", name: "Dollar taïwanais"),
+        .init(code: "ARS", flag: "🇦🇷", name: "Peso argentin"),
+        .init(code: "CLP", flag: "🇨🇱", name: "Peso chilien"),
+        .init(code: "COP", flag: "🇨🇴", name: "Peso colombien"),
+        .init(code: "PEN", flag: "🇵🇪", name: "Sol péruvien"),
+        .init(code: "XPF", flag: "🇵🇫", name: "Franc pacifique"),
     ]
 
     static func currency(_ code: String) -> Currency {
@@ -73,25 +101,60 @@ final class CurrencyService: ObservableObject {
     }
 
     func refresh() {
-        guard !isLoading, let url = URL(string: "https://api.frankfurter.app/latest?from=EUR") else { return }
+        guard !isLoading else { return }
         isLoading = true
         Task {
             defer { self.isLoading = false }
-            guard let response = try? await URLSession.shared.data(from: url),
-                  let json = try? JSONSerialization.jsonObject(with: response.0) as? [String: Any],
-                  let raw = json["rates"] as? [String: Any] else {
+            var fetched = await Self.fetchERAPI()
+            if fetched == nil { fetched = await Self.fetchFrankfurter() }
+            if let result = fetched {
+                self.rates = result.rates
+                self.date = result.date
+                self.fetchedAt = Date()
+                self.failed = false
+                UserDefaults.standard.set(result.rates, forKey: self.ratesKey)
+                UserDefaults.standard.set(result.date, forKey: self.dateKey)
+            } else {
                 self.failed = self.rates.isEmpty
-                return
             }
-            var parsed = raw.compactMapValues { ($0 as? NSNumber)?.doubleValue }
-            parsed["EUR"] = 1
-            self.rates = parsed
-            self.date = json["date"] as? String
-            self.fetchedAt = Date()
-            self.failed = false
-            UserDefaults.standard.set(parsed, forKey: self.ratesKey)
-            UserDefaults.standard.set(self.date, forKey: self.dateKey)
         }
+    }
+
+    private struct Fetched: Sendable {
+        let rates: [String: Double]
+        let date: String?
+    }
+
+    private static func fetchJSON(_ url: String) async -> [String: Any]? {
+        guard let url = URL(string: url),
+              let response = try? await URLSession.shared.data(from: url) else { return nil }
+        return try? JSONSerialization.jsonObject(with: response.0) as? [String: Any]
+    }
+
+    /// 160+ devises (dont AED, MAD, XOF…), mises à jour une fois par jour.
+    private static func fetchERAPI() async -> Fetched? {
+        guard let json = await fetchJSON("https://open.er-api.com/v6/latest/EUR"),
+              json["result"] as? String == "success",
+              let raw = json["rates"] as? [String: Any] else { return nil }
+        var rates = raw.compactMapValues { ($0 as? NSNumber)?.doubleValue }
+        rates["EUR"] = 1
+        var date: String?
+        if let unix = (json["time_last_update_unix"] as? NSNumber)?.doubleValue {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            date = formatter.string(from: Date(timeIntervalSince1970: unix))
+        }
+        return Fetched(rates: rates, date: date)
+    }
+
+    /// Repli : taux de la Banque centrale européenne (≈ 30 devises).
+    private static func fetchFrankfurter() async -> Fetched? {
+        guard let json = await fetchJSON("https://api.frankfurter.app/latest?from=EUR"),
+              let raw = json["rates"] as? [String: Any] else { return nil }
+        var rates = raw.compactMapValues { ($0 as? NSNumber)?.doubleValue }
+        rates["EUR"] = 1
+        return Fetched(rates: rates, date: json["date"] as? String)
     }
 
     /// Taux de `from` vers `to`, si connus.
