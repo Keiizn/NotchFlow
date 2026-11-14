@@ -43,6 +43,17 @@ struct SystemView: View {
                 )
             }
             StatTile(
+                title: "Réseau",
+                value: "↓ " + Self.rate(system.downloadRate),
+                fraction: nil,
+                color: .blue,
+                icon: "network",
+                detail: "↑ " + Self.rate(system.uploadRate)
+            ) {
+                let peak = max(system.downloadHistory.max() ?? 1, 1)
+                Sparkline(values: system.downloadHistory.map { $0 / peak }, color: .blue)
+            }
+            StatTile(
                 title: "Allumé depuis",
                 value: Self.uptime(system.uptime),
                 fraction: nil,
@@ -76,6 +87,10 @@ struct SystemView: View {
 
     static func bytes(_ value: Double) -> String {
         ByteCountFormatter.string(fromByteCount: Int64(value), countStyle: .memory)
+    }
+
+    static func rate(_ bytesPerSecond: Double) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(bytesPerSecond), countStyle: .file) + "/s"
     }
 
     static func uptime(_ seconds: TimeInterval) -> String {

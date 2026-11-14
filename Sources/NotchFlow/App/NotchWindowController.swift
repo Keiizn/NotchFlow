@@ -39,20 +39,25 @@ final class NotchPanel: NSPanel {
     }
 }
 
+extension NSScreen {
+    var displayID: CGDirectDisplayID {
+        (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value ?? 0
+    }
+}
+
+/// Un notch (fenêtre + modèle) par écran.
 @MainActor
 final class NotchWindowController {
     let viewModel = NotchViewModel()
+    let screenID: CGDirectDisplayID
     private var panel: NotchPanel?
     private var monitors: [Any] = []
 
-    init() {
-        NotificationCenter.default.addObserver(
-            forName: NSApplication.didChangeScreenParametersNotification,
-            object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.layout() }
-        }
+    init(screenID: CGDirectDisplayID) {
+        self.screenID = screenID
     }
+
+    var screen: NSScreen? { NSScreen.screens.first { $0.displayID == screenID } }
 
     func show() {
         let size = viewModel.windowSize
@@ -89,31 +94,25 @@ final class NotchWindowController {
         layout()
         panel.orderFrontRegardless()
         installMonitors()
-
-        // Mise à jour automatique : HUD « ↓ vX.Y.Z » dans le notch avant le redémarrage.
-        UpdateChecker.shared.onWillInstall = { [weak self] version in
-            guard let vm = self?.viewModel else { return }
-            vm.close()
-            vm.showHUD(.update(version), duration: 3)
-        }
-        UpdateChecker.shared.start()
-
-        // Raccourci global ⌥⌘N
-        HotKeyService.shared.onPress = { [weak self] in self?.viewModel.toggle() }
-        HotKeyService.shared.register()
-
-        // Touches volume / luminosité → HUD du notch
-        MediaKeyService.shared.start()
     }
 
-    /// Place la fenêtre en haut au centre de l'écran qui possède un notch (ou l'écran principal).
+    func teardown() {
+        for monitor in monitors { NSEvent.removeMonitor(monitor) }
+        monitors = []
+        panel?.orderOut(nil)
+        panel?.close()
+        panel = nil
+    }
+
+    /// Place la fenêtre en haut au centre de son écran.
     func layout() {
-        guard let panel, let screen = NotchGeometry.targetScreen() else { return }
+        guard let panel, let screen else { return }
         viewModel.updateScreen(screen)
         let size = viewModel.windowSize
         let frame = screen.frame
         let origin = NSPoint(x: frame.midX - size.width / 2, y: frame.maxY - size.height)
         panel.setFrame(NSRect(origin: origin, size: size), display: true)
+        panel.applyLevel()
     }
 
     private func installMonitors() {
@@ -140,5 +139,39 @@ final class NotchWindowController {
                 self?.viewModel.handleClickOutside(at: NSEvent.mouseLocation)
             }
         }) { monitors.append(clicks) }
+
+        // Gestes : balayage (morceau suivant / précédent) et défilement (volume)
+        if let scrollGlobal = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel, handler: { [weak self] event in
+            let scroll = ScrollInput(event)
+            MainActor.assumeIsolated { self?.forward(scroll) }
+        }) { monitors.append(scrollGlobal) }
+
+        if let scrollLocal = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel, handler: { [weak self] event in
+            let scroll = ScrollInput(event)
+            MainActor.assumeIsolated { self?.forward(scroll) }
+            return event
+        }) { monitors.append(scrollLocal) }
+    }
+
+    private func forward(_ s: ScrollInput) {
+        viewModel.handleScroll(dx: s.dx, dy: s.dy, inverted: s.inverted, precise: s.precise,
+                               began: s.began, ended: s.ended, momentum: s.momentum, at: NSEvent.mouseLocation)
+    }
+}
+
+/// Valeurs d'un événement de défilement, extraites avant de changer de contexte.
+private struct ScrollInput {
+    let dx: CGFloat, dy: CGFloat
+    let inverted: Bool, precise: Bool
+    let began: Bool, ended: Bool, momentum: Bool
+
+    init(_ event: NSEvent) {
+        dx = event.scrollingDeltaX
+        dy = event.scrollingDeltaY
+        inverted = event.isDirectionInvertedFromDevice
+        precise = event.hasPreciseScrollingDeltas
+        began = event.phase.contains(.began) || (event.phase.isEmpty && event.momentumPhase.isEmpty && !event.hasPreciseScrollingDeltas)
+        ended = event.phase.contains(.ended) || event.phase.contains(.cancelled)
+        momentum = !event.momentumPhase.isEmpty
     }
 }

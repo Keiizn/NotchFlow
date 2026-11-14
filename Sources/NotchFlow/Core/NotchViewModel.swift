@@ -8,7 +8,7 @@ final class NotchViewModel: ObservableObject {
     enum State { case closed, open }
 
     enum Tab: String, CaseIterable, Identifiable {
-        case home, battery, apps, shelf, timer, reminders, actions, notes, clipboard, system, mirror
+        case home, battery, apps, shelf, timer, tools, reminders, actions, notes, clipboard, system, mirror
         var id: String { rawValue }
         var icon: String {
             switch self {
@@ -17,6 +17,7 @@ final class NotchViewModel: ObservableObject {
             case .apps: "square.grid.3x3.fill"
             case .shelf: "tray.full.fill"
             case .timer: "timer"
+            case .tools: "wrench.and.screwdriver.fill"
             case .reminders: "checklist"
             case .actions: "bolt.fill"
             case .notes: "note.text"
@@ -32,6 +33,7 @@ final class NotchViewModel: ObservableObject {
             case .apps: "Applications"
             case .shelf: "Étagère"
             case .timer: "Minuteur"
+            case .tools: "Outils"
             case .reminders: "Rappels"
             case .actions: "Actions rapides"
             case .notes: "Notes rapides"
@@ -47,6 +49,7 @@ final class NotchViewModel: ObservableObject {
             case .apps: "Lanceur d'apps favorites et apps ouvertes"
             case .shelf: "Déposez des fichiers, partagez-les par AirDrop"
             case .timer: "Minuteur et Pomodoro"
+            case .tools: "Chronomètre, horloges mondiales, calculatrice, pipette"
             case .reminders: "Rappels du jour, à cocher depuis le notch"
             case .actions: "Verrouiller, mode sombre, anti-veille, Raccourcis…"
             case .notes: "Bloc-notes toujours sous la main"
@@ -73,6 +76,11 @@ final class NotchViewModel: ObservableObject {
         case brightness(Float)
         case reminder(String)
         case chargeLimited(Int)    // charge limitée à X %
+        case device(name: String, icon: String, battery: Int?, connected: Bool)
+        case privacy(mic: Bool, app: String?)   // micro (true) ou caméra (false) activé
+        case downloadDone(String)
+        case screenshot
+        case skip(forward: Bool)
     }
 
     /// Affiche les paroles à la place de l'agenda sur l'accueil.
@@ -80,7 +88,7 @@ final class NotchViewModel: ObservableObject {
 
     /// Ce que le notch fermé affiche (« Live Activity »).
     enum Activity: Equatable {
-        case none, music, timer, event
+        case none, music, timer, event, stopwatch, download, privacy
         case hud(HUD)
     }
 
@@ -104,6 +112,9 @@ final class NotchViewModel: ObservableObject {
     private let calendar = CalendarService.shared
     private let battery = BatteryService.shared
     private let volumeService = VolumeService.shared
+    private let stopwatch = StopwatchService.shared
+    private let downloads = DownloadMonitor.shared
+    private let privacy = PrivacyMonitor.shared
 
     private var cancellables = Set<AnyCancellable>()
     private var openTask: Task<Void, Never>?
@@ -119,6 +130,9 @@ final class NotchViewModel: ObservableObject {
             media.objectWillChange,
             timer.objectWillChange,
             calendar.objectWillChange,
+            stopwatch.objectWillChange,
+            downloads.objectWillChange,
+            privacy.objectWillChange,
         ])
         .sink { [weak self] _ in self?.objectWillChange.send() }
         .store(in: &cancellables)
@@ -172,10 +186,30 @@ final class NotchViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Paroles du morceau en cours
-        media.$track
-            .removeDuplicates()
-            .sink { LyricsService.shared.load(for: $0) }
+        BluetoothService.shared.events
+            .sink { [weak self] event in
+                guard let self, self.settings.showDeviceActivity else { return }
+                self.showHUD(.device(name: event.name, icon: event.icon, battery: event.battery, connected: event.connected),
+                             duration: 3)
+            }
+            .store(in: &cancellables)
+
+        privacy.started
+            .sink { [weak self] start in
+                guard let self, self.settings.showPrivacyActivity else { return }
+                self.showHUD(.privacy(mic: start.mic, app: start.app), duration: 2.4)
+            }
+            .store(in: &cancellables)
+
+        downloads.finished
+            .sink { [weak self] url in
+                guard let self, self.settings.showDownloadActivity else { return }
+                self.showHUD(.downloadDone(url.lastPathComponent), duration: 3)
+            }
+            .store(in: &cancellables)
+
+        ScreenshotWatcher.shared.captured
+            .sink { [weak self] _ in self?.showHUD(.screenshot, duration: 2.4) }
             .store(in: &cancellables)
     }
 
@@ -192,8 +226,11 @@ final class NotchViewModel: ObservableObject {
     var activity: Activity {
         if let hud { return .hud(hud) }
         if timer.isActive { return .timer }
+        if stopwatch.isRunning { return .stopwatch }
+        if settings.showDownloadActivity, !downloads.active.isEmpty { return .download }
         if settings.showEventActivity, calendar.upcomingSoon != nil { return .event }
         if settings.showMusicActivity, media.track != nil, media.isPlaying { return .music }
+        if settings.showPrivacyActivity, privacy.micInUse || privacy.cameraInUse { return .privacy }
         return .none
     }
 
@@ -203,7 +240,11 @@ final class NotchViewModel: ObservableObject {
         case .music: notchSize.height + 4
         case .timer: 62
         case .event: 74
-        case .hud(.reminder): 130
+        case .stopwatch: 70
+        case .download: 62
+        case .privacy: 22
+        case .hud(.reminder), .hud(.downloadDone): 130
+        case .hud(.privacy), .hud(.device): 100
         case .hud: 86
         }
     }
@@ -313,6 +354,66 @@ final class NotchViewModel: ObservableObject {
     private func cancelClose() {
         closeTask?.cancel()
         closeTask = nil
+    }
+
+    // MARK: - Gestes (trackpad / molette)
+
+    private var scrollX: CGFloat = 0
+    private var scrollY: CGFloat = 0
+    private var swipeDone = false
+
+    /// Balayage horizontal sur le notch = morceau suivant / précédent,
+    /// défilement vertical = volume. Actif sur le notch fermé et sur la barre
+    /// du haut du notch ouvert.
+    func handleScroll(dx: CGFloat, dy: CGFloat, inverted: Bool, precise: Bool,
+                      began: Bool, ended: Bool, momentum: Bool, at point: CGPoint) {
+        guard settings.gesturesEnabled else { return }
+        if began { resetScroll() }
+        defer { if ended { resetScroll() } }
+        guard !momentum else { return }
+
+        let rect = screenRect(for: shapeSize)
+        let band = CGRect(x: rect.minX, y: rect.maxY - notchSize.height - topOffset - 4,
+                          width: rect.width, height: notchSize.height + topOffset + 4)
+        guard band.insetBy(dx: -8, dy: -2).contains(point) else { return }
+
+        // Le survol ne doit pas ouvrir le notch pendant un geste.
+        if state == .closed {
+            openTask?.cancel()
+            openTask = nil
+        }
+
+        // Normalisation dans le sens des doigts
+        let fingerX = inverted ? dx : -dx
+        let up = inverted ? -dy : dy
+        scrollX += fingerX
+        scrollY += up
+
+        if !swipeDone, abs(scrollX) > 50, abs(scrollX) > abs(scrollY) * 1.6 {
+            swipeDone = true
+            guard media.track != nil else { return }
+            let forward = scrollX < 0
+            forward ? media.next() : media.previous()
+            if settings.haptics {
+                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+            }
+            showHUD(.skip(forward: forward), duration: 1)
+            return
+        }
+
+        guard settings.scrollVolume, !swipeDone, abs(scrollY) > abs(scrollX) else { return }
+        let stepSize: CGFloat = precise ? 12 : 1
+        while abs(scrollY) >= stepSize {
+            let sign: CGFloat = scrollY > 0 ? 1 : -1
+            volumeService.step(by: Float(sign) / 32)
+            scrollY -= sign * stepSize
+        }
+    }
+
+    private func resetScroll() {
+        scrollX = 0
+        scrollY = 0
+        swipeDone = false
     }
 
     // MARK: - Ouverture / fermeture

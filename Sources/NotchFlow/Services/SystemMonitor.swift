@@ -15,6 +15,12 @@ final class SystemMonitor: ObservableObject {
     @Published private(set) var diskTotal: Double = 0
     @Published private(set) var uptime: TimeInterval = 0
     @Published private(set) var thermal: ProcessInfo.ThermalState = .nominal
+    /// Débit réseau en octets par seconde.
+    @Published private(set) var downloadRate: Double = 0
+    @Published private(set) var uploadRate: Double = 0
+    @Published private(set) var downloadHistory: [Double] = []
+
+    private var previousNetwork: (bytesIn: UInt64, bytesOut: UInt64, date: Date)?
 
     private var previousTicks: (user: Double, system: Double, idle: Double, nice: Double)?
     private var timer: Timer?
@@ -45,6 +51,7 @@ final class SystemMonitor: ObservableObject {
         sampleCPU()
         sampleMemory()
         sampleDisk()
+        sampleNetwork()
         uptime = ProcessInfo.processInfo.systemUptime
         thermal = ProcessInfo.processInfo.thermalState
     }
@@ -85,6 +92,51 @@ final class SystemMonitor: ObservableObject {
         let pageSize = Double(getpagesize())
         let used = Double(stats.active_count) + Double(stats.wire_count) + Double(stats.compressor_page_count)
         memoryUsed = used * pageSize
+    }
+
+    private func sampleNetwork() {
+        guard let totals = Self.networkBytes() else { return }
+        let now = Date()
+        if let previous = previousNetwork {
+            let dt = now.timeIntervalSince(previous.date)
+            if dt > 0, totals.bytesIn >= previous.bytesIn, totals.bytesOut >= previous.bytesOut {
+                downloadRate = Double(totals.bytesIn - previous.bytesIn) / dt
+                uploadRate = Double(totals.bytesOut - previous.bytesOut) / dt
+                downloadHistory.append(downloadRate)
+                if downloadHistory.count > 40 { downloadHistory.removeFirst(downloadHistory.count - 40) }
+            }
+        }
+        previousNetwork = (totals.bytesIn, totals.bytesOut, now)
+    }
+
+    /// Octets reçus / envoyés par les interfaces Ethernet et Wi-Fi (compteurs 64 bits).
+    nonisolated static func networkBytes() -> (bytesIn: UInt64, bytesOut: UInt64)? {
+        var mib: [Int32] = [CTL_NET, PF_ROUTE, 0, 0, NET_RT_IFLIST2, 0]
+        var length = 0
+        guard sysctl(&mib, 6, nil, &length, nil, 0) == 0, length > 0 else { return nil }
+        var buffer = [UInt8](repeating: 0, count: length)
+        guard sysctl(&mib, 6, &buffer, &length, nil, 0) == 0 else { return nil }
+
+        var bytesIn: UInt64 = 0
+        var bytesOut: UInt64 = 0
+        buffer.withUnsafeBytes { raw in
+            var offset = 0
+            let headerSize = MemoryLayout<if_msghdr>.size
+            while offset + headerSize <= length {
+                let header = raw.loadUnaligned(fromByteOffset: offset, as: if_msghdr.self)
+                let messageLength = Int(header.ifm_msglen)
+                guard messageLength > 0 else { break }
+                if header.ifm_type == 0x12 /* RTM_IFINFO2 */, offset + MemoryLayout<if_msghdr2>.size <= length {
+                    let info = raw.loadUnaligned(fromByteOffset: offset, as: if_msghdr2.self)
+                    if info.ifm_data.ifi_type == 0x06 /* IFT_ETHER */, info.ifm_flags & IFF_LOOPBACK == 0 {
+                        bytesIn += info.ifm_data.ifi_ibytes
+                        bytesOut += info.ifm_data.ifi_obytes
+                    }
+                }
+                offset += messageLength
+            }
+        }
+        return (bytesIn, bytesOut)
     }
 
     private func sampleDisk() {

@@ -26,16 +26,40 @@ struct ShelfView: View {
                     }
                 }
 
-                VStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     Button { shelf.airDrop(shelf.items) } label: {
                         Label("AirDrop", systemImage: "paperplane.fill")
                     }
                     .buttonStyle(PillButtonStyle(tint: .blue))
 
+                    Button { shelf.zip(shelf.items) } label: {
+                        Label("Compresser", systemImage: "doc.zipper")
+                    }
+                    .buttonStyle(PillButtonStyle(tint: .orange))
+                    .help("Crée une archive .zip de tous les éléments")
+
+                    if !shelf.items.compactMap(FileConverter.kind).isEmpty {
+                        Menu {
+                            ConvertMenu(urls: shelf.items)
+                        } label: {
+                            Label("Convertir", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                        .menuStyle(.button)
+                        .buttonStyle(PillButtonStyle(tint: .purple))
+                        .fixedSize()
+                        .help("Convertisseur : images, PDF, documents, audio, vidéo")
+                    }
+
                     Button { withAnimation { shelf.clear() } } label: {
                         Label("Vider", systemImage: "trash.fill")
                     }
                     .buttonStyle(PillButtonStyle(tint: .red))
+
+                    if shelf.isWorking {
+                        ProgressView().controlSize(.small)
+                    } else if let error = shelf.lastError {
+                        Text(error).font(.system(size: 9.5)).foregroundStyle(.orange)
+                    }
                 }
             }
         }
@@ -92,9 +116,42 @@ struct ShelfItemView: View {
             Button("Ouvrir") { shelf.open(url) }
             Button("Afficher dans le Finder") { shelf.reveal(url) }
             Button("Envoyer par AirDrop") { shelf.airDrop([url]) }
+            Button("Copier") { shelf.copyToPasteboard([url]) }
+            Button("Compresser en .zip") { shelf.zip([url]) }
+            if FileConverter.kind(of: url) != nil {
+                Menu("Convertir") { ConvertMenu(urls: [url]) }
+            }
             Divider()
             Button("Retirer de l'étagère", role: .destructive) { shelf.remove(url) }
         }
         .help(url.path)
+    }
+}
+
+/// Menu du convertisseur : une section par type de fichier présent.
+@MainActor
+struct ConvertMenu: View {
+    let urls: [URL]
+    private var shelf: ShelfStore { .shared }
+
+    var body: some View {
+        let groups = Dictionary(grouping: urls) { FileConverter.kind(of: $0) }
+        ForEach(FileConverter.Kind.allCases, id: \.self) { kind in
+            if let files = groups[kind], !files.isEmpty {
+                Section(urls.count > 1 ? "\(kind.title) (\(files.count))" : kind.title) {
+                    ForEach(FileConverter.targets(for: kind, count: files.count)) { target in
+                        Button(target.title) { shelf.convert(files, to: target) }
+                    }
+                    if kind == .image {
+                        Menu("Réduire") {
+                            Button("50 %") { shelf.convertImages(files, scale: 0.5) }
+                            Button("1920 px max") { shelf.convertImages(files, maxPixels: 1920) }
+                            Button("1280 px max") { shelf.convertImages(files, maxPixels: 1280) }
+                            Button("JPEG léger (1600 px)") { shelf.convertImages(files, to: .jpeg, maxPixels: 1600) }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

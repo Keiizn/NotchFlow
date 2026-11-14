@@ -139,6 +139,18 @@ private struct GeneralSettings: View {
                 Text("Vous pouvez aussi cliquer sur le notch, ou y glisser un fichier pour ouvrir l'étagère.")
             }
 
+            Section {
+                Toggle(isOn: $settings.showOnAllScreens) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Afficher sur tous les écrans")
+                        Text("Un notch (ou une île) en haut de chaque écran branché")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Écrans")
+            }
+
             Section("Réinitialisation") {
                 Button("Rétablir les réglages par défaut…", role: .destructive) { confirmReset = true }
                     .confirmationDialog("Rétablir tous les réglages par défaut ?", isPresented: $confirmReset) {
@@ -267,7 +279,20 @@ private struct ActivitiesSettings: View {
             } header: {
                 Text("Quand le notch est fermé")
             } footer: {
-                Text("Le minuteur s'affiche toujours dans le notch quand il est lancé.")
+                Text("Le minuteur et le chronomètre s'affichent toujours dans le notch quand ils sont lancés.")
+            }
+
+            Section {
+                row("Appareils Bluetooth", "AirPods, casque, clavier… à la connexion, avec leur batterie", "airpodspro", .blue, $settings.showDeviceActivity)
+                row("Micro & caméra", "Pastille orange / verte quand une app les utilise", "mic.fill", .orange, $settings.showPrivacyActivity)
+                row("Téléchargements", "Progression des téléchargements des navigateurs", "arrow.down.circle.fill", .indigo, $settings.showDownloadActivity)
+                if settings.showDownloadActivity {
+                    Toggle("Ajouter les téléchargements terminés à l'étagère", isOn: $settings.downloadsToShelf)
+                }
+            } header: {
+                Text("Live Activities connectées")
+            } footer: {
+                Text("Les téléchargements sont suivis dans le dossier Téléchargements : macOS demandera l'accès à ce dossier la première fois.")
             }
         }
         .formStyle(.grouped)
@@ -412,6 +437,24 @@ private struct ControlsSettings: View {
                 Text("Volume et luminosité")
             } footer: {
                 Text("macOS demande l'autorisation « Accessibilité » pour intercepter ces touches. ⌥⇧ + touche = réglage fin. Après une mise à jour, il peut falloir réactiver NotchFlow dans Réglages Système → Confidentialité et sécurité → Accessibilité.")
+            }
+
+            Section {
+                Toggle(isOn: $settings.gesturesEnabled) {
+                    SettingsRowLabel(title: "Balayer sur le notch",
+                                     subtitle: "Deux doigts vers la gauche / droite : morceau suivant / précédent",
+                                     icon: "hand.draw.fill", color: .pink)
+                }
+                Toggle(isOn: $settings.scrollVolume) {
+                    SettingsRowLabel(title: "Défiler pour le volume",
+                                     subtitle: "Défilement vertical (trackpad ou molette) au-dessus du notch",
+                                     icon: "speaker.wave.2.fill", color: .blue)
+                }
+                .disabled(!settings.gesturesEnabled)
+            } header: {
+                Text("Gestes")
+            } footer: {
+                Text("Les gestes fonctionnent sur le notch fermé et sur la barre du haut du notch ouvert.")
             }
 
             Section {
@@ -584,12 +627,75 @@ private struct WidgetsSettings: View {
                 Button("Effacer l'historique", role: .destructive) { ClipboardService.shared.clear() }
             }
 
-            Section("Étagère & notes") {
+            WorldClockSettings()
+
+            Section {
+                Toggle("Envoyer les captures d'écran dans l'étagère", isOn: $settings.screenshotsToShelf)
+                Button("Afficher les fichiers convertis dans le Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([ShelfStore.workFolder])
+                }
                 Button("Vider l'étagère") { ShelfStore.shared.clear() }
                 Button("Effacer les notes rapides", role: .destructive) { NotesStore.shared.clear() }
+            } header: {
+                Text("Étagère & notes")
+            } footer: {
+                Text("Clic droit sur un fichier de l'étagère → Convertir : images (PNG, JPEG, HEIC, TIFF, PDF), PDF (images, texte, fusion), documents (Word, RTF, HTML, ODT, texte, PDF), audio (AAC, WAV, AIFF), vidéo (MP4, MOV, 720p, extraction audio). Les fichiers créés sont ajoutés à l'étagère.")
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+// MARK: - Horloges mondiales
+
+@MainActor
+private struct WorldClockSettings: View {
+    @EnvironmentObject private var settings: AppSettings
+    @State private var search = ""
+
+    private var matches: [String] {
+        let query = search.trimmingCharacters(in: .whitespaces).lowercased()
+        guard query.count >= 2 else { return [] }
+        return TimeZone.knownTimeZoneIdentifiers
+            .filter { !settings.worldClocks.contains($0) }
+            .filter { $0.lowercased().replacingOccurrences(of: "_", with: " ").contains(query) }
+            .prefix(6)
+            .map { $0 }
+    }
+
+    var body: some View {
+        Section {
+            ForEach(settings.worldClocks, id: \.self) { identifier in
+                HStack {
+                    Text(WorldClock.city(identifier))
+                    Text(identifier).font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    if let zone = TimeZone(identifier: identifier) {
+                        Text(WorldClock.time(zone, now: Date())).monospacedDigit().foregroundStyle(.secondary)
+                    }
+                    Button {
+                        settings.worldClocks.removeAll { $0 == identifier }
+                    } label: {
+                        Image(systemName: "minus.circle.fill").foregroundStyle(.red)
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+            TextField("Ajouter une ville", text: $search, prompt: Text("Paris, Tokyo, New York…"))
+            ForEach(matches, id: \.self) { identifier in
+                Button {
+                    settings.worldClocks.append(identifier)
+                    search = ""
+                } label: {
+                    Label(identifier.replacingOccurrences(of: "_", with: " "), systemImage: "plus.circle.fill")
+                }
+                .buttonStyle(.borderless)
+            }
+        } header: {
+            Text("Horloges mondiales (onglet Outils)")
+        } footer: {
+            Text("Recherchez une grande ville en anglais (ex. « Los Angeles », « Sydney »).")
+        }
     }
 }
 

@@ -28,6 +28,7 @@ struct OpenNotchView: View {
         case .apps: AppsView()
         case .shelf: ShelfView()
         case .timer: TimerView()
+        case .tools: ToolsView()
         case .reminders: RemindersView()
         case .actions: ActionsView()
         case .notes: NotesView()

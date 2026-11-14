@@ -42,6 +42,16 @@
     <string>NotchFlow utilise votre position approximative pour afficher la météo locale.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>NotchFlow utilise votre position approximative pour afficher la météo locale.</string>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>NotchFlow affiche vos AirPods et autres appareils Bluetooth avec leur batterie quand ils se connectent.</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>NotchFlow affiche la progression de vos téléchargements dans le notch.</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>NotchFlow ajoute vos captures d'écran et convertit les fichiers de l'étagère.</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>NotchFlow convertit les fichiers que vous déposez dans l'étagère.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>NotchFlow détecte quand une app utilise le micro pour l'afficher dans le notch (il n'enregistre rien).</string>
     <key>NSCameraUsageDescription</key>
     <string>NotchFlow utilise la caméra pour la fonction Miroir.</string>
 </dict>

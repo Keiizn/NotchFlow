@@ -6,7 +6,6 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static private(set) var shared: AppDelegate!
 
-    private var notchController: NotchWindowController?
     private var statusItem: NSStatusItem?
     private var settingsWindow: NSWindow?
 
@@ -35,12 +34,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = QuickActions.shared
         _ = BatteryManager.shared
         WeatherService.shared.start()
+        BluetoothService.shared.start()
+        PrivacyMonitor.shared.start()
+        DownloadMonitor.shared.start()
+        ScreenshotWatcher.shared.start()
 
         setupStatusItem()
-
-        let controller = NotchWindowController()
-        controller.show()
-        notchController = controller
+        NotchCoordinator.shared.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -66,7 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func openNotch() {
-        notchController?.viewModel.open()
+        NotchCoordinator.shared.activeViewModel?.open()
     }
 
     @objc func openSettings() {
@@ -82,7 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.center()
             settingsWindow = window
         }
-        notchController?.viewModel.close()
+        NotchCoordinator.shared.closeAll()
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
     }

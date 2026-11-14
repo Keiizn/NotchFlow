@@ -25,6 +25,19 @@ Le notch grossit légèrement au survol, s'ouvre au survol (délai réglable) ou
 - **Presse-papiers** : historique des 30 derniers textes copiés (les mots de passe des gestionnaires sont ignorés), clic = recopier.
 - **Miroir** : aperçu de la caméra avant une visio.
 
+### Nouveautés 1.5
+- **Live Activities connectées** : AirPods / casque / clavier Bluetooth à la connexion avec leur batterie, pastilles micro 🟠 / caméra 🟢 quand une app les utilise (avec le nom de l'app), progression des téléchargements (Safari, Chrome, Brave, Edge, Firefox…).
+- **Gestes** : balayer à deux doigts sur le notch = morceau suivant / précédent, défiler = volume.
+- **Multi-écran** : un notch (ou une île) sur chaque écran branché (Réglages → Général).
+- **Onglet Outils** : chronomètre avec tours, horloges mondiales, calculatrice / convertisseur (unités et devises : « 10 km en mi », « 50 eur en usd »), pipette de couleur.
+- **Débit réseau** en direct dans l'onglet Système.
+- **Étagère + convertisseur de fichiers intégré** (clic droit → Convertir, ou bouton « Convertir ») :
+  - images → PNG, JPEG, HEIC, TIFF, réduction (50 %, 1920 px…), assemblage en PDF ;
+  - PDF → images PNG, texte, fusion de plusieurs PDF ;
+  - documents (txt, rtf, doc, docx, odt, html) → Word, RTF, HTML, ODT, texte, PDF ;
+  - audio → AAC (m4a), WAV, AIFF ; vidéo → MP4, MOV, 720p, extraction audio.
+- Compression **.zip**, et les **captures d'écran** peuvent arriver directement dans l'étagère.
+
 ### Nouveautés 1.4 — gestion de la batterie (façon AlDente)
 - **Limite de charge** (20–100 %, 80 % recommandé) : le Mac reste alimenté par le secteur mais la batterie ne dépasse pas la limite.
 - **Marge de reprise** (« sailing ») : la charge ne reprend que sous *limite − marge*, pour éviter les micro-recharges.

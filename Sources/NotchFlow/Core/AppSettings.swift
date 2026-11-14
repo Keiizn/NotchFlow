@@ -50,7 +50,29 @@ final class AppSettings: ObservableObject {
         static let heatProtection = "heatProtection"
         static let heatLimit = "heatLimit"
         static let restoreChargingOnQuit = "restoreChargingOnQuit"
+        static let showDeviceActivity = "showDeviceActivity"
+        static let showPrivacyActivity = "showPrivacyActivity"
+        static let showDownloadActivity = "showDownloadActivity"
+        static let downloadsToShelf = "downloadsToShelf"
+        static let screenshotsToShelf = "screenshotsToShelf"
+        static let gesturesEnabled = "gesturesEnabled"
+        static let scrollVolume = "scrollVolume"
+        static let showOnAllScreens = "showOnAllScreens"
+        static let worldClocks = "worldClocks"
+        static let tabsMigrationTools = "tabsMigrationV4"
     }
+
+    // MARK: Live Activities connectées, gestes, multi-écran, outils
+    @Published var showDeviceActivity: Bool { didSet { store(showDeviceActivity, Keys.showDeviceActivity) } }
+    @Published var showPrivacyActivity: Bool { didSet { store(showPrivacyActivity, Keys.showPrivacyActivity) } }
+    @Published var showDownloadActivity: Bool { didSet { store(showDownloadActivity, Keys.showDownloadActivity) } }
+    @Published var downloadsToShelf: Bool { didSet { store(downloadsToShelf, Keys.downloadsToShelf) } }
+    @Published var screenshotsToShelf: Bool { didSet { store(screenshotsToShelf, Keys.screenshotsToShelf) } }
+    @Published var gesturesEnabled: Bool { didSet { store(gesturesEnabled, Keys.gesturesEnabled) } }
+    @Published var scrollVolume: Bool { didSet { store(scrollVolume, Keys.scrollVolume) } }
+    @Published var showOnAllScreens: Bool { didSet { store(showOnAllScreens, Keys.showOnAllScreens) } }
+    /// Identifiants de fuseaux horaires (ex. « America/New_York »).
+    @Published var worldClocks: [String] { didSet { store(worldClocks, Keys.worldClocks) } }
 
     // MARK: Batterie (façon AlDente)
     @Published var chargeLimiterEnabled: Bool { didSet { store(chargeLimiterEnabled, Keys.chargeLimiterEnabled) } }
@@ -82,7 +104,7 @@ final class AppSettings: ObservableObject {
     @Published var autoInstallUpdates: Bool { didSet { store(autoInstallUpdates, Keys.autoInstallUpdates) } }
 
     /// Onglets activés par défaut (le miroir est désactivé par défaut).
-    static let defaultTabs = ["home", "battery", "apps", "shelf", "timer", "reminders", "actions", "notes", "clipboard", "system"]
+    static let defaultTabs = ["home", "battery", "apps", "shelf", "timer", "tools", "reminders", "actions", "notes", "clipboard", "system"]
 
     @Published var enabledTabs: [String] { didSet { store(enabledTabs, Keys.enabledTabs) } }
     @Published var favoriteApps: [String] { didSet { store(favoriteApps, Keys.favoriteApps) } }
@@ -167,6 +189,15 @@ final class AppSettings: ObservableObject {
             Keys.heatProtection: true,
             Keys.heatLimit: 35.0,
             Keys.restoreChargingOnQuit: true,
+            Keys.showDeviceActivity: true,
+            Keys.showPrivacyActivity: true,
+            Keys.showDownloadActivity: true,
+            Keys.downloadsToShelf: false,
+            Keys.screenshotsToShelf: false,
+            Keys.gesturesEnabled: true,
+            Keys.scrollVolume: true,
+            Keys.showOnAllScreens: false,
+            Keys.worldClocks: ["America/New_York", "Europe/London", "Asia/Tokyo"],
             Keys.enabledTabs: Self.defaultTabs,
             Keys.closeOnClickOutside: true,
             Keys.showShadow: true,
@@ -222,6 +253,25 @@ final class AppSettings: ObservableObject {
         heatProtection = d.bool(forKey: Keys.heatProtection)
         heatLimit = d.double(forKey: Keys.heatLimit)
         restoreChargingOnQuit = d.bool(forKey: Keys.restoreChargingOnQuit)
+        showDeviceActivity = d.bool(forKey: Keys.showDeviceActivity)
+        showPrivacyActivity = d.bool(forKey: Keys.showPrivacyActivity)
+        showDownloadActivity = d.bool(forKey: Keys.showDownloadActivity)
+        downloadsToShelf = d.bool(forKey: Keys.downloadsToShelf)
+        screenshotsToShelf = d.bool(forKey: Keys.screenshotsToShelf)
+        gesturesEnabled = d.bool(forKey: Keys.gesturesEnabled)
+        scrollVolume = d.bool(forKey: Keys.scrollVolume)
+        showOnAllScreens = d.bool(forKey: Keys.showOnAllScreens)
+        worldClocks = d.stringArray(forKey: Keys.worldClocks) ?? []
+
+        // Ajoute une seule fois l'onglet Outils (après le minuteur).
+        if !d.bool(forKey: Keys.tabsMigrationTools) {
+            if !enabledTabs.contains("tools") {
+                let index = enabledTabs.firstIndex(of: "timer").map { $0 + 1 } ?? enabledTabs.count
+                enabledTabs.insert("tools", at: index)
+            }
+            d.set(enabledTabs, forKey: Keys.enabledTabs)
+            d.set(true, forKey: Keys.tabsMigrationTools)
+        }
 
         if !d.bool(forKey: Keys.tabsMigrationBattery) {
             if !enabledTabs.contains("battery") {
