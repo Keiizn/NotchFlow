@@ -28,7 +28,21 @@ Le notch grossit légèrement au survol, s'ouvre au survol (délai réglable) ou
 ### Réglages
 Style **Notch** ou **Dynamic Island** (île flottante sur les écrans sans notch), taille d'ouverture, ouverture au survol + délai, haptique, lancement au démarrage, activation de chaque module, ville météo, °C / °F.
 
-## Prérequis
+## Installation (une commande)
+
+Ouvre le **Terminal** et colle :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Keiizn/NotchFlow/main/install.sh | bash
+```
+
+La même commande sert pour les mises à jour. Elle télécharge la dernière version, l'installe dans
+`/Applications` et la lance. Comme le fichier est téléchargé par `curl` et non par un navigateur,
+macOS ne le met pas en quarantaine : le message « Impossible d'ouvrir l'application » n'apparaît pas.
+
+## Compiler soi-même
+
+### Prérequis
 - macOS 14 Sonoma ou plus récent (idéalement un MacBook avec notch, mais ça fonctionne partout)
 - Xcode 15+ ou les Command Line Tools (Swift 5.9+)
 
