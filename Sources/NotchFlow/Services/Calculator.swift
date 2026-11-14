@@ -10,7 +10,6 @@ final class Calculator: ObservableObject {
     @Published private(set) var result: String?
     @Published private(set) var isLoading = false
 
-    private var rates: [String: (date: Date, rates: [String: Double])] = [:]
     private var currencyTask: Task<Void, Never>?
 
     private init() {}
@@ -109,35 +108,33 @@ final class Calculator: ObservableObject {
     private static func currency(_ text: String) -> String? {
         if let code = currencySymbols[text] { return code }
         let upper = text.uppercased()
-        return currencyCodes.contains(upper) ? upper : nil
+        return currencyCodes.contains(upper) || CurrencyService.currencies.contains(where: { $0.code == upper }) ? upper : nil
     }
 
     private func convertCurrency(_ value: Double, from: String, to: String) {
-        if from == to { result = "\(Self.format(value)) \(to)"; return }
-        if let cached = rates[from], Date().timeIntervalSince(cached.date) < 3600, let rate = cached.rates[to] {
-            result = "\(Self.format(value * rate, decimals: 2)) \(to)"
+        let service = CurrencyService.shared
+        if let converted = service.convert(value, from: from, to: to) {
+            result = "\(Self.format(converted, decimals: 2)) \(to)"
+        }
+        guard service.rates.isEmpty || service.rate(from: from, to: to) == nil else {
+            service.refreshIfNeeded()
             return
         }
+        // Taux pas encore chargés : on attend la réponse puis on recalcule.
         isLoading = true
-        result = nil
+        service.refresh()
         currencyTask = Task { [weak self] in
-            // Taux de la Banque centrale européenne, sans clé API
-            guard let url = URL(string: "https://api.frankfurter.app/latest?from=\(from)") else { return }
-            let data = try? await URLSession.shared.data(from: url).0
+            for _ in 0..<40 {
+                try? await Task.sleep(for: .milliseconds(250))
+                if Task.isCancelled { return }
+                if !service.isLoading { break }
+            }
             guard let self, !Task.isCancelled else { return }
             self.isLoading = false
-            guard let data,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let raw = json["rates"] as? [String: Any] else {
-                self.result = "Taux indisponible"
-                return
-            }
-            let parsed = raw.compactMapValues { ($0 as? NSNumber)?.doubleValue }
-            self.rates[from] = (Date(), parsed)
-            if let rate = parsed[to] {
-                self.result = "\(Self.format(value * rate, decimals: 2)) \(to)"
+            if let converted = service.convert(value, from: from, to: to) {
+                self.result = "\(Self.format(converted, decimals: 2)) \(to)"
             } else {
-                self.result = "Devise inconnue"
+                self.result = service.failed ? "Taux indisponible" : "Devise inconnue"
             }
         }
     }

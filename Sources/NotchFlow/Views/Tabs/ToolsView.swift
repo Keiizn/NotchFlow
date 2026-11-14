@@ -152,9 +152,24 @@ private struct CalculatorCard: View {
     @ObservedObject private var calculator = Calculator.shared
     @State private var copied = false
 
+    @AppStorage("tools.calculatorMode") private var currencyMode = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ToolHeader(title: "Calcul & conversion", icon: "function", color: .orange)
+            HStack(spacing: 4) {
+                ModeChip(title: "Calcul", icon: "function", selected: !currencyMode) { currencyMode = false }
+                ModeChip(title: "Devises", icon: "dollarsign.arrow.circlepath", selected: currencyMode) { currencyMode = true }
+            }
+            if currencyMode {
+                CurrencyConverterView()
+            } else {
+                calculatorBody
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var calculatorBody: some View {
             TextField("12*(3+4), 10 km en mi, 50 € en $…", text: $calculator.input)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12, design: .rounded))
@@ -187,7 +202,6 @@ private struct CalculatorCard: View {
                 }
             }
             Spacer(minLength: 0)
-        }
     }
 
     private func copyResult() {
@@ -199,6 +213,147 @@ private struct CalculatorCard: View {
             try? await Task.sleep(for: .seconds(1.2))
             copied = false
         }
+    }
+}
+
+// MARK: - Convertisseur de devises
+
+@MainActor
+private struct CurrencyConverterView: View {
+    @ObservedObject private var service = CurrencyService.shared
+    @AppStorage("currency.from") private var from = "EUR"
+    @AppStorage("currency.to") private var to = "USD"
+    @AppStorage("currency.amount") private var amountText = "100"
+    @State private var copied = false
+
+    private var amount: Double { MathExpression.number(amountText) ?? MathExpression.evaluate(amountText) ?? 0 }
+    private var converted: Double? { service.convert(amount, from: from, to: to) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 4) {
+                TextField("Montant", text: $amountText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(Color.white.opacity(0.08)))
+                currencyMenu($from)
+            }
+
+            HStack(spacing: 4) {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                        let previous = from
+                        from = to
+                        to = previous
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 9, weight: .bold))
+                        .frame(width: 18, height: 16)
+                        .background(Circle().fill(Color.white.opacity(0.1)))
+                }
+                .buttonStyle(PressableButtonStyle())
+                .help("Inverser")
+                Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
+            }
+
+            HStack(spacing: 4) {
+                Button(action: copy) {
+                    HStack(spacing: 3) {
+                        if let converted {
+                            Text(Calculator.format(converted, decimals: 2))
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                                .foregroundStyle(.green)
+                                .contentTransition(.numericText())
+                        } else if service.isLoading {
+                            ProgressView().controlSize(.mini)
+                        } else {
+                            Text(service.failed ? "Hors ligne" : "—")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        if converted != nil {
+                            Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .buttonStyle(PressableButtonStyle())
+                .help("Copier le montant converti")
+                currencyMenu($to)
+            }
+            .animation(.easeOut(duration: 0.2), value: converted)
+
+            HStack(spacing: 3) {
+                if let rate = service.rate(from: from, to: to) {
+                    Text("1 \(from) = \(Calculator.format(rate, decimals: 4)) \(to)")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                Spacer(minLength: 0)
+                Button { service.refresh() } label: {
+                    Image(systemName: "arrow.clockwise").font(.system(size: 8, weight: .bold))
+                }
+                .buttonStyle(PressableButtonStyle())
+                .help(service.formattedDate.map { "Taux BCE du \($0) — actualiser" } ?? "Actualiser les taux")
+            }
+            .font(.system(size: 9))
+            .foregroundStyle(.secondary)
+        }
+        .onAppear { service.refreshIfNeeded() }
+    }
+
+    private func currencyMenu(_ selection: Binding<String>) -> some View {
+        let current = CurrencyService.currency(selection.wrappedValue)
+        return Menu {
+            ForEach(CurrencyService.currencies) { currency in
+                Button("\(currency.flag)  \(currency.code) — \(currency.name)") { selection.wrappedValue = currency.code }
+            }
+        } label: {
+            Text("\(current.flag) \(current.code)")
+                .font(.system(size: 11, weight: .semibold))
+        }
+        .menuStyle(.button)
+        .buttonStyle(PillButtonStyle())
+        .fixedSize()
+    }
+
+    private func copy() {
+        guard let converted else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(Calculator.format(converted, decimals: 2), forType: .string)
+        copied = true
+        Task {
+            try? await Task.sleep(for: .seconds(1.2))
+            copied = false
+        }
+    }
+}
+
+private struct ModeChip: View {
+    let title: String
+    let icon: String
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.system(size: 9.5, weight: .semibold))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.white.opacity(selected ? 0.16 : 0.04)))
+                .foregroundStyle(selected ? Color.orange : Color.white.opacity(0.55))
+        }
+        .buttonStyle(PressableButtonStyle())
     }
 }
 

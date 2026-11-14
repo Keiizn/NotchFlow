@@ -29,7 +29,7 @@ Le notch grossit légèrement au survol, s'ouvre au survol (délai réglable) ou
 - **Live Activities connectées** : AirPods / casque / clavier Bluetooth à la connexion avec leur batterie, pastilles micro 🟠 / caméra 🟢 quand une app les utilise (avec le nom de l'app), progression des téléchargements (Safari, Chrome, Brave, Edge, Firefox…).
 - **Gestes** : balayer à deux doigts sur le notch = morceau suivant / précédent, défiler = volume.
 - **Multi-écran** : un notch (ou une île) sur chaque écran branché (Réglages → Général).
-- **Onglet Outils** : chronomètre avec tours, horloges mondiales, calculatrice / convertisseur (unités et devises : « 10 km en mi », « 50 eur en usd »), pipette de couleur.
+- **Onglet Outils** : chronomètre avec tours, horloges mondiales, calculatrice / convertisseur d’unités (« 10 km en mi »), **convertisseur de devises** (31 monnaies, taux BCE du jour, inversion en un clic, fonctionne hors ligne avec les derniers taux), pipette de couleur.
 - **Débit réseau** en direct dans l'onglet Système.
 - **Étagère + convertisseur de fichiers intégré** (clic droit → Convertir, ou bouton « Convertir ») :
   - images → PNG, JPEG, HEIC, TIFF, réduction (50 %, 1920 px…), assemblage en PDF ;
