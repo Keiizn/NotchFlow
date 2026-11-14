@@ -50,6 +50,7 @@ final class AppSettings: ObservableObject {
         static let heatProtection = "heatProtection"
         static let heatLimit = "heatLimit"
         static let restoreChargingOnQuit = "restoreChargingOnQuit"
+        static let sleepCharging = "sleepCharging"
         static let showDeviceActivity = "showDeviceActivity"
         static let showPrivacyActivity = "showPrivacyActivity"
         static let showDownloadActivity = "showDownloadActivity"
@@ -84,6 +85,20 @@ final class AppSettings: ObservableObject {
     @Published var heatProtection: Bool { didSet { store(heatProtection, Keys.heatProtection) } }
     @Published var heatLimit: Double { didSet { store(heatLimit, Keys.heatLimit) } }
     @Published var restoreChargingOnQuit: Bool { didSet { store(restoreChargingOnQuit, Keys.restoreChargingOnQuit) } }
+
+    /// Que faire de la charge quand le Mac se met en veille (NotchFlow ne tourne plus).
+    enum SleepCharging: String, CaseIterable, Identifiable {
+        case stop, preventSleep, allow
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .stop: "Couper la charge"
+            case .preventSleep: "Rester éveillé jusqu'à la limite"
+            case .allow: "Laisser macOS charger"
+            }
+        }
+    }
+    @Published var sleepCharging: SleepCharging { didSet { store(sleepCharging.rawValue, Keys.sleepCharging) } }
 
     enum Theme: String, CaseIterable, Identifiable {
         case glass, black
@@ -189,6 +204,7 @@ final class AppSettings: ObservableObject {
             Keys.heatProtection: true,
             Keys.heatLimit: 35.0,
             Keys.restoreChargingOnQuit: true,
+            Keys.sleepCharging: SleepCharging.stop.rawValue,
             Keys.showDeviceActivity: true,
             Keys.showPrivacyActivity: true,
             Keys.showDownloadActivity: true,
@@ -253,6 +269,7 @@ final class AppSettings: ObservableObject {
         heatProtection = d.bool(forKey: Keys.heatProtection)
         heatLimit = d.double(forKey: Keys.heatLimit)
         restoreChargingOnQuit = d.bool(forKey: Keys.restoreChargingOnQuit)
+        sleepCharging = SleepCharging(rawValue: d.string(forKey: Keys.sleepCharging) ?? "") ?? .stop
         showDeviceActivity = d.bool(forKey: Keys.showDeviceActivity)
         showPrivacyActivity = d.bool(forKey: Keys.showPrivacyActivity)
         showDownloadActivity = d.bool(forKey: Keys.showDownloadActivity)

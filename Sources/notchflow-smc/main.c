@@ -19,7 +19,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define HELPER_VERSION "1"
+#define HELPER_VERSION "2"
 
 #define KERNEL_INDEX_SMC      2
 #define SMC_CMD_READ_BYTES    5
@@ -138,43 +138,80 @@ static int read_byte(const char *key, int *value) {
 
 // --- Commandes ---------------------------------------------------------------
 
+// Écrit puis relit la clé : certaines écritures sont acceptées par le SMC sans effet.
+static int write_verified(const char *key, const unsigned char *bytes, UInt32 count) {
+    if (smc_write(key, bytes, count) != 0) return -1;
+    unsigned char buffer[32] = {0};
+    UInt32 size = 0;
+    if (smc_read(key, buffer, &size) != 0) return 0;   // lecture impossible : on fait confiance
+    return buffer[0] == bytes[0] ? 0 : -1;
+}
+
+// On écrit sur TOUTES les clés présentes (firmware récent et ancien) : selon les
+// modèles et versions de macOS, une seule des deux familles est réellement active.
 static int set_charging(int enabled) {
+    int found = 0, ok = 0;
     if (has_key("CHTE")) {
+        found = 1;
         unsigned char value[4] = { enabled ? 0x00 : 0x01, 0, 0, 0 };
-        return smc_write("CHTE", value, 4);
+        if (write_verified("CHTE", value, 4) == 0) ok = 1;
     }
-    if (has_key("CH0B") && has_key("CH0C")) {
+    if (has_key("CH0B")) {
+        found = 1;
         unsigned char value[1] = { enabled ? 0x00 : 0x02 };
-        if (smc_write("CH0B", value, 1) != 0) return -1;
-        return smc_write("CH0C", value, 1);
+        int b = write_verified("CH0B", value, 1);
+        int c = has_key("CH0C") ? write_verified("CH0C", value, 1) : 0;
+        if (b == 0 && c == 0) ok = 1;
     }
-    return -2;
+    if (!found) return -2;
+    return ok ? 0 : -1;
 }
 
 static int set_adapter(int enabled) {
+    int found = 0, ok = 0;
     if (has_key("CHIE")) {
+        found = 1;
         unsigned char value[1] = { enabled ? 0x00 : 0x08 };
-        return smc_write("CHIE", value, 1);
+        if (write_verified("CHIE", value, 1) == 0) ok = 1;
     }
     if (has_key("CH0I")) {
+        found = 1;
         unsigned char value[1] = { enabled ? 0x00 : 0x01 };
-        return smc_write("CH0I", value, 1);
+        if (write_verified("CH0I", value, 1) == 0) ok = 1;
     }
-    return -2;
+    if (!found) return -2;
+    return ok ? 0 : -1;
+}
+
+// État réel : la charge est coupée si l'une des clés actives le dit.
+static int charging_disabled(int *known) {
+    int value = 0, disabled = 0;
+    *known = 0;
+    if (has_key("CHTE") && read_byte("CHTE", &value) == 0) { *known = 1; if (value != 0) disabled = 1; }
+    if (has_key("CH0B") && read_byte("CH0B", &value) == 0) { *known = 1; if (value != 0) disabled = 1; }
+    return disabled;
+}
+
+static int adapter_disabled(int *known) {
+    int value = 0, disabled = 0;
+    *known = 0;
+    if (has_key("CHIE") && read_byte("CHIE", &value) == 0) { *known = 1; if (value != 0) disabled = 1; }
+    if (has_key("CH0I") && read_byte("CH0I", &value) == 0) { *known = 1; if (value != 0) disabled = 1; }
+    return disabled;
 }
 
 static void print_status(void) {
-    const char *chargingKey = has_key("CHTE") ? "CHTE" : ((has_key("CH0B") && has_key("CH0C")) ? "CH0B" : "none");
-    const char *adapterKey = has_key("CHIE") ? "CHIE" : (has_key("CH0I") ? "CH0I" : "none");
-    int charging = 0, adapter = 0;
-    int chargingOK = strcmp(chargingKey, "none") != 0 && read_byte(chargingKey, &charging) == 0;
-    int adapterOK = strcmp(adapterKey, "none") != 0 && read_byte(adapterKey, &adapter) == 0;
+    const char *chargingKey = has_key("CHTE") ? (has_key("CH0B") ? "CHTE+CH0B" : "CHTE") : (has_key("CH0B") ? "CH0B" : "none");
+    const char *adapterKey = has_key("CHIE") ? (has_key("CH0I") ? "CHIE+CH0I" : "CHIE") : (has_key("CH0I") ? "CH0I" : "none");
+    int chargingKnown = 0, adapterKnown = 0;
+    int chargingOff = charging_disabled(&chargingKnown);
+    int adapterOff = adapter_disabled(&adapterKnown);
 
     printf("version=%s\n", HELPER_VERSION);
     printf("charging_key=%s\n", chargingKey);
     printf("adapter_key=%s\n", adapterKey);
-    printf("charging=%s\n", chargingOK ? (charging == 0 ? "enabled" : "disabled") : "unknown");
-    printf("adapter=%s\n", adapterOK ? (adapter == 0 ? "enabled" : "disabled") : "unknown");
+    printf("charging=%s\n", chargingKnown ? (chargingOff ? "disabled" : "enabled") : "unknown");
+    printf("adapter=%s\n", adapterKnown ? (adapterOff ? "disabled" : "enabled") : "unknown");
 }
 
 static int usage(void) {

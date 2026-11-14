@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import IOKit
+import IOKit.pwr_mgt
 
 /// Santé et mesures détaillées de la batterie (registre IOKit « AppleSmartBattery », sans droits admin).
 struct BatteryHealth: Equatable {
@@ -57,11 +58,16 @@ final class BatteryManager: ObservableObject {
     /// Charge ponctuelle jusqu'à 100 % (ignore la limite jusqu'au plein).
     @Published var topUpActive = false { didSet { evaluate() } }
     @Published private(set) var lastError: String?
+    /// Clés SMC utilisées et état réel lu dans le SMC (diagnostic).
+    @Published private(set) var smcKeys = ""
+    @Published private(set) var smcCharging = "?"
+    @Published private(set) var smcAdapter = "?"
+    @Published private(set) var preventingSleep = false
 
     /// Émis quand la limite est atteinte (pour la Live Activity).
     let limitReached = PassthroughSubject<Int, Never>()
 
-    static let helperVersion = "1"
+    static let helperVersion = "2"
     static let installedHelper = "/usr/local/libexec/notchflow-smc"
     static var bundledHelper: String {
         Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/notchflow-smc").path
@@ -72,6 +78,8 @@ final class BatteryManager: ObservableObject {
     private var timer: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var isApplying = false
+    private var pendingEvaluate = false
+    private var sleepAssertion: IOPMAssertionID = 0
 
     var isLimiterActive: Bool { settings.chargeLimiterEnabled && helperState == .ready }
 
@@ -94,27 +102,25 @@ final class BatteryManager: ObservableObject {
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.evaluate() } }
             .store(in: &cancellables)
 
-        timer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in
+        // Toutes les 15 s : santé + resynchronisation avec l'état RÉEL du SMC
+        // (le firmware peut réactiver la charge tout seul, notamment après la veille).
+        timer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.refreshHealth()
-                self?.evaluate()
+                self?.syncWithSMC()
             }
         }
 
-        // Pas de décharge forcée pendant la veille : le Mac ne pourrait pas l'arrêter.
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.willSleepNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, self.adapterDisabled else { return }
-                self.runHelperSync(["adapter", "on"])
-                self.adapterDisabled = false
-            }
+            MainActor.assumeIsolated { self?.prepareForSleep() }
         }
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.evaluate() }
+            // Le SMC peut avoir été réinitialisé pendant la veille : on relit son état.
+            MainActor.assumeIsolated { self?.syncWithSMC(delay: 3) }
         }
 
         checkHelper()
@@ -143,8 +149,7 @@ final class BatteryManager: ObservableObject {
                 helperState = .unsupported
                 return
             }
-            chargingInhibited = status.output.contains("charging=disabled")
-            adapterDisabled = status.output.contains("adapter=disabled")
+            readStatus(status.output)
             helperState = .ready
             evaluate()
         }
@@ -192,16 +197,96 @@ final class BatteryManager: ObservableObject {
         }
     }
 
+    // MARK: - État réel du SMC
+
+    private func readStatus(_ output: String) {
+        func value(_ key: String) -> String? {
+            output.split(separator: "\n").first { $0.hasPrefix(key + "=") }.map { String($0.dropFirst(key.count + 1)) }
+        }
+        smcKeys = [value("charging_key"), value("adapter_key")].compactMap { $0 }.joined(separator: " / ")
+        smcCharging = value("charging") ?? "?"
+        smcAdapter = value("adapter") ?? "?"
+        if smcCharging != "unknown" { chargingInhibited = smcCharging == "disabled" }
+        if smcAdapter != "unknown" { adapterDisabled = smcAdapter == "disabled" }
+    }
+
+    /// Relit le SMC puis réapplique la logique si l'état a dérivé.
+    func syncWithSMC(delay: Double = 0) {
+        guard helperState == .ready else { evaluate(); return }
+        Task {
+            if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+            guard !isApplying else { return }
+            let status = await Self.run(Self.installedHelper, ["status"])
+            if status.status == 0 { readStatus(status.output) }
+            evaluate()
+        }
+    }
+
+    // MARK: - Veille
+
+    /// Avant la veille, NotchFlow ne peut plus surveiller la charge.
+    private func prepareForSleep() {
+        releaseSleepAssertion()
+        guard helperState == .ready else { return }
+        // Jamais de décharge forcée pendant la veille.
+        if adapterDisabled {
+            battery.suppressEventsUntil = Date().addingTimeInterval(8)
+            runHelperSync(["adapter", "on"])
+            adapterDisabled = false
+        }
+        guard isLimiterActive, !topUpActive else { return }
+        switch settings.sleepCharging {
+        case .stop, .preventSleep:
+            // Sinon le Mac chargerait jusqu'à 100 % pendant la nuit.
+            if !chargingInhibited {
+                runHelperSync(["charging", "off"])
+                chargingInhibited = true
+            }
+        case .allow:
+            break
+        }
+    }
+
+    /// Empêche la veille (sur secteur) tant que la batterie n'a pas atteint la limite.
+    private func updateSleepAssertion() {
+        let want = isLimiterActive && settings.sleepCharging == .preventSleep
+            && battery.isPluggedIn && mode == .charging
+        if want && sleepAssertion == 0 {
+            var id: IOPMAssertionID = 0
+            let result = IOPMAssertionCreateWithName(
+                "PreventSystemSleep" as CFString,
+                IOPMAssertionLevel(kIOPMAssertionLevelOn),
+                "NotchFlow : charge jusqu'à la limite" as CFString,
+                &id
+            )
+            if result == kIOReturnSuccess { sleepAssertion = id }
+        } else if !want {
+            releaseSleepAssertion()
+        }
+        preventingSleep = sleepAssertion != 0
+    }
+
+    private func releaseSleepAssertion() {
+        if sleepAssertion != 0 {
+            IOPMAssertionRelease(sleepAssertion)
+            sleepAssertion = 0
+        }
+        preventingSleep = false
+    }
+
     // MARK: - Logique de charge
 
     func evaluate() {
-        guard !isApplying else { return }
+        guard !isApplying else { pendingEvaluate = true; return }
+        defer { updateSleepAssertion() }
         guard battery.hasBattery else {
             mode = .notManaged
             return
         }
         let level = battery.level
-        let plugged = battery.isPluggedIn
+        // Adaptateur coupé par NotchFlow : macOS croit le Mac débranché, mais il ne l'est pas.
+        // On continue donc la décharge jusqu'à la limite (si on débranche entre-temps, c'est sans effet).
+        let plugged = battery.isPluggedIn || adapterDisabled
 
         guard isLimiterActive else {
             // Limiteur coupé : on rend la main à macOS si on avait modifié l'état.
@@ -213,7 +298,7 @@ final class BatteryManager: ObservableObject {
         }
 
         if topUpActive && level >= 100 {
-            topUpActive = false
+            topUpActive = false   // relance evaluate() via didSet
             return
         }
 
@@ -239,7 +324,7 @@ final class BatteryManager: ObservableObject {
             wantCharging = false
             mode = .tooHot
         } else if level >= limit {
-            if !chargingInhibited && level >= limit && !topUpActive {
+            if !chargingInhibited && !topUpActive && lastError == nil {
                 limitReached.send(limit)
             }
             wantCharging = false
@@ -261,25 +346,51 @@ final class BatteryManager: ObservableObject {
         isApplying = true
         Task {
             var errors: [String] = []
+            // Ordre sûr : on coupe la charge AVANT de couper l'adaptateur, et on rebranche
+            // l'adaptateur AVANT de relancer la charge.
+            if adapter && adapterDisabled {
+                await setAdapter(true, errors: &errors)
+            }
             if charging == chargingInhibited {
                 let r = await Self.run("/usr/bin/sudo", ["-n", Self.installedHelper, "charging", charging ? "on" : "off"])
                 if r.status == 0 { chargingInhibited = !charging } else { errors.append(r.output) }
             }
-            if adapter == adapterDisabled {
-                let r = await Self.run("/usr/bin/sudo", ["-n", Self.installedHelper, "adapter", adapter ? "on" : "off"])
-                if r.status == 0 { adapterDisabled = !adapter } else { errors.append(r.output) }
+            if !adapter && !adapterDisabled {
+                await setAdapter(false, errors: &errors)
             }
-            lastError = errors.isEmpty ? nil : "L'assistant a refusé la commande. Réinstallez-le dans Réglages → Batterie."
+            // Relit l'état réel pour l'affichage et le diagnostic
+            let status = await Self.run(Self.installedHelper, ["status"])
+            if status.status == 0 { readStatus(status.output) }
+
+            if errors.isEmpty {
+                lastError = nil
+            } else if errors.contains(where: { $0.contains("password") || $0.contains("sudo") }) {
+                lastError = "Autorisation perdue : réinstallez l'assistant dans Réglages → Batterie."
+            } else {
+                lastError = "Le Mac a refusé la commande (\(errors.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "erreur")). Désactivez « Recharge optimisée » dans Réglages Système → Batterie."
+            }
             isApplying = false
+            if pendingEvaluate {
+                pendingEvaluate = false
+                evaluate()
+            }
         }
+    }
+
+    private func setAdapter(_ enabled: Bool, errors: inout [String]) async {
+        // macOS va signaler un faux débranchement / rebranchement : pas de HUD pour ça.
+        battery.suppressEventsUntil = Date().addingTimeInterval(8)
+        let r = await Self.run("/usr/bin/sudo", ["-n", Self.installedHelper, "adapter", enabled ? "on" : "off"])
+        if r.status == 0 { adapterDisabled = !enabled } else { errors.append(r.output) }
     }
 
     /// Appelé à la fermeture de l'app : rend la charge à macOS (synchrone).
     func restoreForQuit() {
-        guard helperState == .ready, settings.restoreChargingOnQuit,
-              chargingInhibited || adapterDisabled else { return }
-        runHelperSync(["charging", "on"])
-        runHelperSync(["adapter", "on"])
+        releaseSleepAssertion()
+        guard helperState == .ready else { return }
+        // La décharge forcée est toujours arrêtée, même si l'option est désactivée.
+        if adapterDisabled { runHelperSync(["adapter", "on"]) }
+        if settings.restoreChargingOnQuit && chargingInhibited { runHelperSync(["charging", "on"]) }
     }
 
     private func runHelperSync(_ arguments: [String]) {

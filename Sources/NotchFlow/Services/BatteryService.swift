@@ -15,6 +15,8 @@ final class BatteryService: ObservableObject {
     @Published private(set) var minutesRemaining: Int?
 
     let events = PassthroughSubject<Event, Never>()
+    /// Pendant une décharge forcée, macOS voit le chargeur « débranché » : on ignore ces faux événements.
+    var suppressEventsUntil = Date.distantPast
     private var runLoopSource: CFRunLoopSource?
 
     var symbolName: String {
@@ -67,7 +69,7 @@ final class BatteryService: ObservableObject {
             isPluggedIn = plugged
             minutesRemaining = (remaining ?? -1) > 0 ? remaining : nil
 
-            if !initial && plugged != wasPlugged {
+            if !initial && plugged != wasPlugged && Date() > suppressEventsUntil {
                 events.send(plugged ? .pluggedIn(newLevel) : .unplugged(newLevel))
             }
             return

@@ -373,6 +373,22 @@ private struct BatterySettings: View {
             }
 
             Section {
+                Picker("Pendant la veille", selection: $settings.sleepCharging) {
+                    ForEach(AppSettings.SleepCharging.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                if manager.preventingSleep {
+                    Label("Veille bloquée jusqu'à \(settings.chargeLimit) %", systemImage: "moon.zzz.fill")
+                        .font(.caption).foregroundStyle(.orange)
+                }
+            } header: {
+                Text("Veille")
+            } footer: {
+                Text("Quand le Mac dort, NotchFlow ne peut plus arrêter la charge à la limite : sans précaution, la batterie monte à 100 % pendant la nuit. « Couper la charge » met la charge en pause avant la veille (elle reprend au réveil si besoin). « Rester éveillé » empêche la veille sur secteur tant que la limite n'est pas atteinte, puis coupe la charge. La décharge forcée est toujours arrêtée avant la veille.")
+            }
+
+            Section {
                 Toggle("Protection thermique", isOn: $settings.heatProtection)
                 if settings.heatProtection {
                     LabeledContent("Pause de la charge au-dessus de") {
@@ -389,6 +405,20 @@ private struct BatterySettings: View {
                 Text("La chaleur est l'ennemie n°1 des batteries lithium : la charge est mise en pause si la batterie dépasse la température choisie.")
             }
 
+            if manager.helperState == .ready {
+                Section {
+                    LabeledContent("Clés SMC", value: manager.smcKeys.isEmpty ? "—" : manager.smcKeys)
+                    LabeledContent("Charge (SMC)") { smcLabel(manager.smcCharging, on: "Autorisée", off: "En pause") }
+                    LabeledContent("Adaptateur (SMC)") { smcLabel(manager.smcAdapter, on: "Utilisé", off: "Coupé (décharge)") }
+                    LabeledContent("Batterie", value: String(format: "%+.1f W", manager.health.batteryWatts))
+                    Button("Relire l'état") { manager.syncWithSMC() }
+                } header: {
+                    Text("Diagnostic")
+                } footer: {
+                    Text("État lu directement dans le contrôleur de charge du Mac, toutes les 15 s. Si la charge reste « Autorisée » au-dessus de la limite, envoyez une capture de cette section.")
+                }
+            }
+
             Section("Santé de la batterie") {
                 LabeledContent("Capacité maximale", value: manager.health.healthPercent > 0 ? "\(manager.health.healthPercent) %" : "—")
                 LabeledContent("Cycles", value: "\(manager.health.cycleCount)")
@@ -400,7 +430,19 @@ private struct BatterySettings: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { manager.refreshHealth() }
+        .onAppear {
+            manager.refreshHealth()
+            manager.syncWithSMC()
+        }
+    }
+
+    @ViewBuilder
+    private func smcLabel(_ value: String, on: String, off: String) -> some View {
+        switch value {
+        case "enabled": Label(on, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+        case "disabled": Label(off, systemImage: "pause.circle.fill").foregroundStyle(.orange)
+        default: Text("Inconnu").foregroundStyle(.secondary)
+        }
     }
 }
 
