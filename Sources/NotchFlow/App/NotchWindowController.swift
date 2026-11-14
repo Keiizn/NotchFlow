@@ -89,6 +89,14 @@ final class NotchWindowController {
         layout()
         panel.orderFrontRegardless()
         installMonitors()
+
+        // Mise à jour automatique : HUD « ↓ vX.Y.Z » dans le notch avant le redémarrage.
+        UpdateChecker.shared.onWillInstall = { [weak self] version in
+            guard let vm = self?.viewModel else { return }
+            vm.close()
+            vm.showHUD(.update(version), duration: 3)
+        }
+        UpdateChecker.shared.start()
     }
 
     /// Place la fenêtre en haut au centre de l'écran qui possède un notch (ou l'écran principal).

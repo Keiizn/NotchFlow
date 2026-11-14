@@ -32,7 +32,12 @@ final class AppSettings: ObservableObject {
         static let showShadow = "showShadow"
         static let hoverGrow = "hoverGrow"
         static let showBatteryInHeader = "showBatteryInHeader"
+        static let autoCheckUpdates = "autoCheckUpdates"
+        static let autoInstallUpdates = "autoInstallUpdates"
     }
+
+    @Published var autoCheckUpdates: Bool { didSet { store(autoCheckUpdates, Keys.autoCheckUpdates) } }
+    @Published var autoInstallUpdates: Bool { didSet { store(autoInstallUpdates, Keys.autoInstallUpdates) } }
 
     /// Onglets activés par défaut (le miroir est désactivé par défaut).
     static let defaultTabs = ["home", "apps", "shelf", "timer", "notes", "clipboard", "system"]
@@ -111,6 +116,8 @@ final class AppSettings: ObservableObject {
             Keys.showShadow: true,
             Keys.hoverGrow: true,
             Keys.showBatteryInHeader: true,
+            Keys.autoCheckUpdates: true,
+            Keys.autoInstallUpdates: true,
             Keys.openHeight: 170.0,
             Keys.showMusicActivity: true,
             Keys.showBatteryActivity: true,
@@ -143,6 +150,8 @@ final class AppSettings: ObservableObject {
         showShadow = d.bool(forKey: Keys.showShadow)
         hoverGrow = d.bool(forKey: Keys.hoverGrow)
         showBatteryInHeader = d.bool(forKey: Keys.showBatteryInHeader)
+        autoCheckUpdates = d.bool(forKey: Keys.autoCheckUpdates)
+        autoInstallUpdates = d.bool(forKey: Keys.autoInstallUpdates)
     }
 
     private func store(_ value: Any, _ key: String) {

@@ -17,6 +17,18 @@ mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources"
 cp "$BIN_DIR/NotchFlow" "${APP}/Contents/MacOS/NotchFlow"
 cp Support/Info.plist "${APP}/Contents/Info.plist"
 
+# Version : tag git (v1.2.3 → 1.2.3), numéro de build = nombre de commits
+VERSION="${VERSION:-$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')}"
+VERSION="${VERSION:-1.0.0}"
+BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
+COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo inconnu)"
+PLIST="${APP}/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "${PLIST}"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD_NUMBER}" "${PLIST}"
+/usr/libexec/PlistBuddy -c "Add :NFCommit string ${COMMIT}" "${PLIST}" 2>/dev/null \
+  || /usr/libexec/PlistBuddy -c "Set :NFCommit ${COMMIT}" "${PLIST}"
+echo "▸ Version ${VERSION} (build ${BUILD_NUMBER}, ${COMMIT})"
+
 # Icône : génère l'.icns à partir de Support/AppIcon.png (1024×1024)
 if [ -f Support/AppIcon.png ]; then
   echo "▸ Génération de l'icône…"

@@ -103,6 +103,11 @@ struct CompactNotchView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.orange)
                 .symbolEffect(.bounce, value: kind)
+        case .update:
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.blue)
+                .symbolEffect(.pulse)
         }
     }
 
@@ -128,6 +133,11 @@ struct CompactNotchView: View {
             Text("Terminé")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.orange)
+        case .update(let version):
+            Text("v\(version)")
+                .font(.system(size: 12, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(.blue)
         }
     }
 

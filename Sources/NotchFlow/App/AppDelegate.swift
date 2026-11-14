@@ -48,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(withTitle: "Ouvrir le notch", action: #selector(openNotch), keyEquivalent: "")
         menu.addItem(withTitle: "Réglages…", action: #selector(openSettings), keyEquivalent: ",")
+        menu.addItem(withTitle: "Rechercher les mises à jour…", action: #selector(checkForUpdates), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quitter NotchFlow", action: #selector(quit), keyEquivalent: "q")
         for menuItem in menu.items { menuItem.target = self }
@@ -75,6 +76,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notchController?.viewModel.close()
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    /// Ouvre « À propos » (qui lance la vérification) dans les réglages.
+    @objc func checkForUpdates() {
+        UpdateChecker.shared.check()
+        openSettings()
     }
 
     @objc func quit() {

@@ -60,6 +60,7 @@ final class NotchViewModel: ObservableObject {
         case charging(Int)
         case unplugged(Int)
         case timerDone
+        case update(String)        // nouvelle version en cours d'installation
     }
 
     /// Ce que le notch fermé affiche (« Live Activity »).

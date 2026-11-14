@@ -378,22 +378,106 @@ private struct WidgetsSettings: View {
 
 @MainActor
 private struct AboutSettings: View {
+    @EnvironmentObject private var settings: AppSettings
+    @ObservedObject private var updater = UpdateChecker.shared
+
     var body: some View {
-        VStack(spacing: 14) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 112, height: 112)
-            Text("NotchFlow").font(.largeTitle.bold())
-            Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
-                .foregroundStyle(.secondary)
-            Text("Le notch de votre Mac devient un centre de contrôle animé : musique, agenda, météo, apps, fichiers, minuteur, notes, presse-papiers et statistiques système.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: 380)
-            Link("Code source sur GitHub", destination: URL(string: "https://github.com/Keiizn/NotchFlow")!)
+        Form {
+            Section {
+                VStack(spacing: 8) {
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .frame(width: 96, height: 96)
+                    Text("NotchFlow").font(.title.bold())
+                    Text("Version \(UpdateChecker.version)")
+                        .font(.headline)
+                    Text("Build \(UpdateChecker.build)\(UpdateChecker.commit.map { " · \($0)" } ?? "")")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                    Text("Le notch de votre Mac devient un centre de contrôle animé : musique, agenda, météo, apps, fichiers, minuteur, notes, presse-papiers et statistiques système.")
+                        .font(.callout)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: 400)
+                        .padding(.top, 4)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            }
+
+            Section {
+                LabeledContent("État") { statusView }
+                if case .available = updater.status, !updater.releaseNotes.isEmpty {
+                    Text(updater.releaseNotes)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(6)
+                }
+                HStack {
+                    Button("Rechercher les mises à jour") { updater.check() }
+                        .disabled(isBusy)
+                    if case .available = updater.status {
+                        Button("Installer maintenant") { updater.installUpdate() }
+                            .buttonStyle(.borderedProminent)
+                    }
+                    Spacer()
+                    if let last = updater.lastCheck {
+                        Text("Vérifié \(last.formatted(.relative(presentation: .named)))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Toggle("Rechercher automatiquement (au lancement puis toutes les 6 h)", isOn: $settings.autoCheckUpdates)
+                Toggle("Télécharger et installer automatiquement", isOn: $settings.autoInstallUpdates)
+                    .disabled(!settings.autoCheckUpdates)
+                if !UpdateChecker.canSelfUpdate {
+                    Text("L'app ne peut pas se mettre à jour seule à cet emplacement. Placez-la dans /Applications, ou installez avec la commande Terminal.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            } header: {
+                Text("Mises à jour")
+            } footer: {
+                Text("La mise à jour est téléchargée depuis GitHub, installée, puis NotchFlow redémarre tout seul. macOS peut redemander certaines autorisations ensuite.")
+            }
+
+            Section {
+                Link("Code source sur GitHub", destination: URL(string: "https://github.com/\(UpdateChecker.repository)")!)
+                Link("Historique des versions", destination: UpdateChecker.releasesURL)
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
+        .formStyle(.grouped)
+        .onAppear {
+            if updater.status == .idle { updater.check() }
+        }
+    }
+
+    private var isBusy: Bool {
+        switch updater.status {
+        case .checking, .downloading, .installing: true
+        default: false
+        }
+    }
+
+    @ViewBuilder
+    private var statusView: some View {
+        switch updater.status {
+        case .idle:
+            Text("—").foregroundStyle(.secondary)
+        case .checking:
+            HStack(spacing: 6) { ProgressView().controlSize(.small); Text("Vérification…") }
+        case .upToDate:
+            Label("À jour", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+        case .available(let version):
+            Label("Version \(version) disponible", systemImage: "arrow.down.circle.fill").foregroundStyle(.blue)
+        case .downloading(let version):
+            HStack(spacing: 6) { ProgressView().controlSize(.small); Text("Téléchargement de la \(version)…") }
+        case .installing(let version):
+            HStack(spacing: 6) { ProgressView().controlSize(.small); Text("Installation de la \(version)…") }
+        case .failed(let message):
+            Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+        }
     }
 }
 
