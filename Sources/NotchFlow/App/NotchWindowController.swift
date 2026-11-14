@@ -16,17 +16,26 @@ final class NotchPanel: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
-        // Au-dessus de la barre des menus (dessinée plus haut depuis macOS 26 Tahoe),
-        // sinon les titres de menus apparaissent par-dessus le notch ouvert.
-        level = .popUpMenu
         collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
         isMovable = false
-        isFloatingPanel = true
+        // ⚠️ Ne pas utiliser `isFloatingPanel = true` : il remet le niveau à `.floating`,
+        // sous la barre des menus, et les menus s'affichaient alors par-dessus le notch.
         hidesOnDeactivate = false
         becomesKeyOnlyIfNeeded = true
         isReleasedWhenClosed = false
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
+        applyLevel()
+    }
+
+    /// Au-dessus de la barre des menus et des icônes d'état (niveau 24-25).
+    func applyLevel() {
+        level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
+    }
+
+    override func orderFrontRegardless() {
+        applyLevel()
+        super.orderFrontRegardless()
     }
 }
 
