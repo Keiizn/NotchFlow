@@ -104,6 +104,16 @@ final class CurrencyService: ObservableObject {
         rate(from: from, to: to).map { amount * $0 }
     }
 
+    static func format(_ value: Double, decimals: Int = 2) -> String {
+        guard value.isFinite else { return "∞" }
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = decimals
+        formatter.minimumFractionDigits = decimals == 2 ? 2 : 0
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+
     /// « 15 novembre 2026 »
     var formattedDate: String? {
         guard let date else { return nil }

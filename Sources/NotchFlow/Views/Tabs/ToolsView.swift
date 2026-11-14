@@ -1,13 +1,13 @@
 import SwiftUI
 
-/// Boîte à outils : chronomètre, horloges mondiales, calculatrice / convertisseur, pipette.
+/// Boîte à outils : chronomètre, horloges mondiales, convertisseur de devises, pipette.
 @MainActor
 struct ToolsView: View {
     var body: some View {
         HStack(spacing: 10) {
             StopwatchCard().glassCard()
             WorldClockCard().glassCard()
-            CalculatorCard().glassCard()
+            CurrencyCard().glassCard()
             ColorPickerCard().frame(width: 128).glassCard()
         }
     }
@@ -145,73 +145,15 @@ enum WorldClock {
     }
 }
 
-// MARK: - Calculatrice
+// MARK: - Devises
 
 @MainActor
-private struct CalculatorCard: View {
-    @ObservedObject private var calculator = Calculator.shared
-    @State private var copied = false
-
-    @AppStorage("tools.calculatorMode") private var currencyMode = false
-
+private struct CurrencyCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 4) {
-                ModeChip(title: "Calcul", icon: "function", selected: !currencyMode) { currencyMode = false }
-                ModeChip(title: "Devises", icon: "dollarsign.arrow.circlepath", selected: currencyMode) { currencyMode = true }
-            }
-            if currencyMode {
-                CurrencyConverterView()
-            } else {
-                calculatorBody
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var calculatorBody: some View {
-            TextField("12*(3+4), 10 km en mi, 50 € en $…", text: $calculator.input)
-                .textFieldStyle(.plain)
-                .font(.system(size: 12, design: .rounded))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.white.opacity(0.08)))
-                .onSubmit(copyResult)
-            Group {
-                if calculator.isLoading {
-                    ProgressView().controlSize(.small)
-                } else if let result = calculator.result {
-                    Button(action: copyResult) {
-                        HStack(spacing: 4) {
-                            Text("= \(result)")
-                                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.6)
-                            Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                                .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .buttonStyle(PressableButtonStyle())
-                    .help("Copier le résultat (↩)")
-                } else {
-                    Text("Unités : km, mi, kg, lb, °c, °f, l, go, km/h… Devises : eur, usd, gbp, chf…")
-                        .font(.system(size: 9.5))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
+            ToolHeader(title: "Convertisseur de devises", icon: "dollarsign.arrow.circlepath", color: .green)
+            CurrencyConverterView()
             Spacer(minLength: 0)
-    }
-
-    private func copyResult() {
-        guard let result = calculator.result else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(result, forType: .string)
-        copied = true
-        Task {
-            try? await Task.sleep(for: .seconds(1.2))
-            copied = false
         }
     }
 }
@@ -264,7 +206,7 @@ private struct CurrencyConverterView: View {
                 Button(action: copy) {
                     HStack(spacing: 3) {
                         if let converted {
-                            Text(Calculator.format(converted, decimals: 2))
+                            Text(CurrencyService.format(converted, decimals: 2))
                                 .font(.system(size: 16, weight: .bold, design: .rounded))
                                 .monospacedDigit()
                                 .lineLimit(1)
@@ -294,7 +236,7 @@ private struct CurrencyConverterView: View {
 
             HStack(spacing: 3) {
                 if let rate = service.rate(from: from, to: to) {
-                    Text("1 \(from) = \(Calculator.format(rate, decimals: 4)) \(to)")
+                    Text("1 \(from) = \(CurrencyService.format(rate, decimals: 4)) \(to)")
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 }
@@ -329,31 +271,12 @@ private struct CurrencyConverterView: View {
     private func copy() {
         guard let converted else { return }
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(Calculator.format(converted, decimals: 2), forType: .string)
+        NSPasteboard.general.setString(CurrencyService.format(converted, decimals: 2), forType: .string)
         copied = true
         Task {
             try? await Task.sleep(for: .seconds(1.2))
             copied = false
         }
-    }
-}
-
-private struct ModeChip: View {
-    let title: String
-    let icon: String
-    let selected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Label(title, systemImage: icon)
-                .font(.system(size: 9.5, weight: .semibold))
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(Capsule().fill(Color.white.opacity(selected ? 0.16 : 0.04)))
-                .foregroundStyle(selected ? Color.orange : Color.white.opacity(0.55))
-        }
-        .buttonStyle(PressableButtonStyle())
     }
 }
 

@@ -49,7 +49,7 @@ final class NotchViewModel: ObservableObject {
             case .apps: "Lanceur d'apps favorites et apps ouvertes"
             case .shelf: "Déposez des fichiers, partagez-les par AirDrop"
             case .timer: "Minuteur et Pomodoro"
-            case .tools: "Chronomètre, horloges mondiales, calculatrice, pipette"
+            case .tools: "Chronomètre, horloges mondiales, convertisseur de devises, pipette"
             case .reminders: "Rappels du jour, à cocher depuis le notch"
             case .actions: "Verrouiller, mode sombre, anti-veille, Raccourcis…"
             case .notes: "Bloc-notes toujours sous la main"
