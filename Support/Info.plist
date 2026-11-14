@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>fr</string>
+    <key>CFBundleDisplayName</key>
+    <string>NotchFlow</string>
+    <key>CFBundleExecutable</key>
+    <string>NotchFlow</string>
+    <key>CFBundleIdentifier</key>
+    <string>app.notchflow.NotchFlow</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>NotchFlow</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>NotchFlow contrôle Spotify et Musique pour afficher et piloter le morceau en cours dans le notch.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>NotchFlow affiche vos prochains événements dans le notch.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>NotchFlow affiche vos prochains événements dans le notch.</string>
+    <key>NSLocationUsageDescription</key>
+    <string>NotchFlow utilise votre position approximative pour afficher la météo locale.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>NotchFlow utilise votre position approximative pour afficher la météo locale.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>NotchFlow utilise la caméra pour la fonction Miroir.</string>
+</dict>
+</plist>
