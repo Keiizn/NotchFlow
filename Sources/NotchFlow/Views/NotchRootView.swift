@@ -19,8 +19,8 @@ struct NotchRootView: View {
                     bottomRadius: vm.bottomRadius,
                     height: size.height
                 ))
-                .shadow(color: .black.opacity(vm.isOpen ? 0.5 : 0), radius: 16, y: 6)
-                .scaleEffect(vm.isHovering && !vm.isOpen ? 1.06 : 1, anchor: .top)
+                .shadow(color: .black.opacity(vm.isOpen && settings.showShadow ? 0.5 : 0), radius: 16, y: 6)
+                .scaleEffect(vm.isHovering && !vm.isOpen && settings.hoverGrow ? 1.06 : 1, anchor: .top)
                 .padding(.top, vm.topOffset)
                 .onTapGesture { if !vm.isOpen { vm.open() } }
                 .onDrop(of: [UTType.fileURL], isTargeted: $vm.isDropTargeted) { providers in

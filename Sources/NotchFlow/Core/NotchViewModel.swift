@@ -8,26 +8,50 @@ final class NotchViewModel: ObservableObject {
     enum State { case closed, open }
 
     enum Tab: String, CaseIterable, Identifiable {
-        case home, shelf, timer, clipboard, mirror
+        case home, apps, shelf, timer, notes, clipboard, system, mirror
         var id: String { rawValue }
         var icon: String {
             switch self {
             case .home: "house.fill"
+            case .apps: "square.grid.3x3.fill"
             case .shelf: "tray.full.fill"
             case .timer: "timer"
+            case .notes: "note.text"
             case .clipboard: "doc.on.clipboard.fill"
+            case .system: "cpu"
             case .mirror: "camera.fill"
             }
         }
         var title: String {
             switch self {
             case .home: "Accueil"
+            case .apps: "Applications"
             case .shelf: "Étagère"
             case .timer: "Minuteur"
+            case .notes: "Notes rapides"
             case .clipboard: "Presse-papiers"
+            case .system: "Système"
             case .mirror: "Miroir"
             }
         }
+        var subtitle: String {
+            switch self {
+            case .home: "Musique, agenda et météo"
+            case .apps: "Lanceur d'apps favorites et apps ouvertes"
+            case .shelf: "Déposez des fichiers, partagez-les par AirDrop"
+            case .timer: "Minuteur et Pomodoro"
+            case .notes: "Bloc-notes toujours sous la main"
+            case .clipboard: "Historique des textes copiés"
+            case .system: "Processeur, mémoire, disque, batterie"
+            case .mirror: "Aperçu de la caméra"
+            }
+        }
+    }
+
+    /// Onglets affichés, dans l'ordre canonique.
+    var visibleTabs: [Tab] {
+        let tabs = Tab.allCases.filter { settings.isTabEnabled($0.rawValue) }
+        return tabs.isEmpty ? [.home] : tabs
     }
 
     /// Notifications éphémères affichées autour du notch fermé.
@@ -194,7 +218,7 @@ final class NotchViewModel: ObservableObject {
     }
 
     func handleClickOutside(at point: CGPoint) {
-        guard isOpen, !screenRect(for: openSize).contains(point) else { return }
+        guard isOpen, settings.closeOnClickOutside, !screenRect(for: openSize).contains(point) else { return }
         close()
     }
 
@@ -242,6 +266,7 @@ final class NotchViewModel: ObservableObject {
         cancelOpen()
         cancelClose()
         if let tab { self.tab = tab }
+        if !visibleTabs.contains(self.tab) { self.tab = visibleTabs[0] }
         guard state != .open else { return }
         hasEnteredOpenZone = screenRect(for: openSize).insetBy(dx: -16, dy: -16).contains(NSEvent.mouseLocation)
         hudTask?.cancel()

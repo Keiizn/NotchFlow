@@ -28,6 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = ClipboardService.shared
         _ = ShelfStore.shared
         _ = TimerService.shared
+        _ = AppLauncher.shared
+        _ = NotesStore.shared
         WeatherService.shared.start()
 
         setupStatusItem()
@@ -62,8 +64,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let hosting = NSHostingController(rootView: SettingsView().environmentObject(AppSettings.shared))
             let window = NSWindow(contentViewController: hosting)
             window.title = "Réglages NotchFlow"
-            window.styleMask = [.titled, .closable, .miniaturizable]
+            window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+            window.toolbarStyle = .unified
+            window.titlebarAppearsTransparent = true
             window.isReleasedWhenClosed = false
+            window.setContentSize(NSSize(width: 780, height: 560))
             window.center()
             settingsWindow = window
         }

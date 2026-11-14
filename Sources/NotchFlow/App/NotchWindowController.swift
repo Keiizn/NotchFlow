@@ -7,6 +7,11 @@ final class NotchPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
+    /// Empêche macOS de repousser la fenêtre sous la barre des menus.
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        frameRect
+    }
+
     func configure() {
         isOpaque = false
         backgroundColor = .clear
@@ -58,9 +63,14 @@ final class NotchWindowController {
             .environmentObject(ShelfStore.shared)
             .environmentObject(TimerService.shared)
             .environmentObject(ClipboardService.shared)
+            .environmentObject(AppLauncher.shared)
+            .environmentObject(NotesStore.shared)
+            .environmentObject(SystemMonitor.shared)
 
         let hosting = NSHostingView(rootView: AnyView(root))
         hosting.sizingOptions = []
+        // Sans ça, SwiftUI décale tout le contenu sous le notch (zone de sécurité).
+        hosting.safeAreaRegions = []
         hosting.frame = NSRect(origin: .zero, size: size)
         panel.contentView = hosting
 
