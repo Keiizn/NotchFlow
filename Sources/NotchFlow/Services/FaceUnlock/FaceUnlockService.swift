@@ -522,7 +522,7 @@ final class FaceUnlockService: ObservableObject {
             let score = identity.score(sample.embedding)
             scores[identity.id] = score.centroid
             if best == nil || score.centroid > best!.centroid {
-                best = (identity, score.centroid, score.top)
+                best = (identity, score.centroid, score.best)
             }
         }
         liveScores = scores
