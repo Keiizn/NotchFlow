@@ -5,7 +5,8 @@ import SwiftUI
 @MainActor
 struct FaceUnlockSettings: View {
     @ObservedObject private var face = FaceUnlockService.shared
-    @ObservedObject private var keys = MediaKeyService.shared
+    @State private var axTrusted = AXIsProcessTrusted()
+    @State private var axResetDone = false
     @State private var password = ""
     @State private var passwordMessage: String?
     @State private var savingPassword = false
@@ -42,7 +43,7 @@ struct FaceUnlockSettings: View {
                         .font(.caption).foregroundStyle(.orange)
                 }
             } footer: {
-                Text("Tout reste sur ce Mac : les visages sont convertis en empreintes chiffrées (AES-GCM), les images ne sont jamais enregistrées. Une webcam n'a pas de capteur de profondeur : c'est plus pratique mais moins sûr que Touch ID. Après chaque mise à jour, macOS peut redemander les autorisations Caméra et Accessibilité.")
+                FooterText("Tout reste sur ce Mac : les visages sont convertis en empreintes chiffrées (AES-GCM), les images ne sont jamais enregistrées. Une webcam n'a pas de capteur de profondeur : c'est plus pratique mais moins sûr que Touch ID. Après chaque mise à jour, macOS peut redemander les autorisations Caméra et Accessibilité.")
             }
 
             Section("Préparation") {
@@ -59,8 +60,20 @@ struct FaceUnlockSettings: View {
                         }
                     }
                 }
-                checkRow("Accessibilité (pour taper le mot de passe)", ok: keys.isTrusted) {
-                    Button("Autoriser") { keys.requestTrust() }
+                checkRow("Accessibilité (pour taper le mot de passe)", ok: axTrusted) {
+                    HStack {
+                        Button("Réparer") { repairAccessibility() }
+                            .help("Retire l'ancienne autorisation (devenue invalide après une mise à jour) et la redemande")
+                        Button("Autoriser") { MediaKeyService.shared.requestTrust() }
+                    }
+                }
+                if !axTrusted {
+                    Text(axResetDone
+                         ? "Ancienne autorisation retirée. Coche maintenant NotchFlow dans la fenêtre Accessibilité qui vient de s'ouvrir."
+                         : "NotchFlow est déjà coché dans Accessibilité mais refusé ? Après une mise à jour, macOS garde l'ancienne case : clique sur « Réparer ».")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 checkRow("Mot de passe de session", ok: face.hasPassword) { EmptyView() }
                 checkRow("Au moins un visage", ok: !face.identities.isEmpty) {
@@ -97,7 +110,7 @@ struct FaceUnlockSettings: View {
             } header: {
                 Text("Mot de passe")
             } footer: {
-                Text("macOS ne permet pas à une app d'ouvrir la session : quand ton visage est reconnu, NotchFlow tape ce mot de passe à ta place. Il est vérifié, rangé dans le trousseau et n'est chargé en mémoire qu'après Touch ID, pour la durée de session choisie.")
+                FooterText("macOS ne permet pas à une app d'ouvrir la session : quand ton visage est reconnu, NotchFlow tape ce mot de passe à ta place. Il est vérifié, rangé dans le trousseau et n'est chargé en mémoire qu'après Touch ID, pour la durée de session choisie.")
             }
 
             Section {
@@ -110,13 +123,21 @@ struct FaceUnlockSettings: View {
                         .labelsHidden()
                         .toggleStyle(.switch)
                         .controlSize(.small)
-                        TextField("Nom", text: Binding(
+                        TextField("", text: Binding(
                             get: { identity.name },
                             set: { face.rename(identity, to: $0) }
-                        ))
+                        ), prompt: Text("Nom"))
+                        .labelsHidden()
                         .textFieldStyle(.plain)
+                        .font(.body.weight(.medium))
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         Spacer()
-                        Text("\(identity.samples.count) prises").font(.caption).foregroundStyle(.secondary)
+                        Text("\(identity.samples.count) prises")
+                            .font(.caption)
+                            .foregroundStyle(identity.samples.count < FaceUnlockService.enrollTarget ? .orange : .secondary)
+                            .help(identity.samples.count < FaceUnlockService.enrollTarget
+                                  ? "Profil incomplet : ajoute un nouveau visage (\(FaceUnlockService.enrollTarget) prises) puis supprime celui-ci."
+                                  : "")
                         if let score = face.liveScores[identity.id] {
                             Text(String(format: "%.3f", score))
                                 .font(.caption.monospacedDigit())
@@ -137,7 +158,7 @@ struct FaceUnlockSettings: View {
             } header: {
                 Text("Visages")
             } footer: {
-                Text("Ajoute plusieurs profils pour toi (avec lunettes, le soir, avec un bonnet…) ou pour une autre personne. Désactive un profil sans le supprimer avec l'interrupteur.")
+                FooterText("Ajoute plusieurs profils pour toi (avec lunettes, le soir, avec un bonnet…) ou pour une autre personne. Désactive un profil sans le supprimer avec l'interrupteur.")
             }
 
             Section {
@@ -166,7 +187,7 @@ struct FaceUnlockSettings: View {
             } header: {
                 Text("Sécurité")
             } footer: {
-                Text("Plus le seuil est haut, plus la reconnaissance est stricte. Utilise le test ci-dessous, avec toi puis avec une autre personne ou une photo : règle le seuil entre ton score et le sien. La détection du vivant refuse les photos immobiles (léger) ou exige un clignement des yeux (strict) ; une vidéo peut toutefois la tromper.")
+                FooterText("Plus le seuil est haut, plus la reconnaissance est stricte. Utilise le test ci-dessous, avec toi puis avec une autre personne ou une photo : règle le seuil entre ton score et le sien. La détection du vivant refuse les photos immobiles (léger) ou exige un clignement des yeux (strict) ; une vidéo peut toutefois la tromper.")
             }
 
             Section {
@@ -199,11 +220,17 @@ struct FaceUnlockSettings: View {
             } header: {
                 Text("Test")
             } footer: {
-                Text("Le test n'ouvre rien : il affiche le score en direct de chaque visage enregistré.")
+                FooterText("Le test n'ouvre rien : il affiche le score en direct de chaque visage enregistré.")
             }
 
             Section {
                 Toggle("Afficher l'île sur l'écran verrouillé", isOn: $face.showOnLockScreen)
+                if let diagnostic = face.lockDiagnostic {
+                    Label(diagnostic, systemImage: "stethoscope")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 Toggle("Analyser quand la souris bouge", isOn: $face.scanOnMouse)
                 LabeledContent("Durée d'une analyse") {
                     HStack {
@@ -214,7 +241,7 @@ struct FaceUnlockSettings: View {
             } header: {
                 Text("Écran verrouillé")
             } footer: {
-                Text("L'analyse démarre au réveil de l'écran, quand la souris bouge ou quand tu touches l'île. Pendant les 4 secondes qui suivent le verrouillage, rien ne se déclenche, pour te laisser le temps de partir.")
+                FooterText("L'analyse démarre au réveil de l'écran, quand la souris bouge ou quand tu touches l'île. Pendant les 4 secondes qui suivent le verrouillage, rien ne se déclenche, pour te laisser le temps de partir.")
             }
 
             Section {
@@ -229,6 +256,11 @@ struct FaceUnlockSettings: View {
             EnrollSheet().environmentObject(face)
         }
         .onAppear {
+            cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
+            axTrusted = AXIsProcessTrusted()
+        }
+        .onReceive(Timer.publish(every: 1.5, on: .main, in: .common).autoconnect()) { _ in
+            axTrusted = AXIsProcessTrusted()
             cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
         }
         .onDisappear { face.stopTest() }
@@ -298,6 +330,18 @@ struct FaceUnlockSettings: View {
         } label: {
             Label(title, systemImage: ok ? "checkmark.seal" : "circle.dashed")
         }
+    }
+
+    /// Supprime l'entrée Accessibilité périmée (signature d'une ancienne version) puis redemande.
+    private func repairAccessibility() {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        task.arguments = ["reset", "Accessibility", Bundle.main.bundleIdentifier ?? "app.notchflow.NotchFlow"]
+        try? task.run()
+        task.waitUntilExit()
+        axResetDone = true
+        MediaKeyService.shared.requestTrust()
+        open("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
     }
 
     private func open(_ string: String) {

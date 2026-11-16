@@ -16,6 +16,8 @@ final class PrivacyMonitor: ObservableObject {
     @Published private(set) var micInUse = false
     @Published private(set) var cameraInUse = false
     @Published private(set) var micApp: String?
+    /// Toutes les apps qui utilisent le micro en ce moment.
+    @Published private(set) var micApps: [String] = []
 
     /// Émis quand le micro ou la caméra viennent de s'activer.
     let started = PassthroughSubject<Start, Never>()
@@ -46,6 +48,7 @@ final class PrivacyMonitor: ObservableObject {
         micInUse = false
         cameraInUse = false
         micApp = nil
+        micApps = []
     }
 
     private func sample() {
@@ -58,6 +61,7 @@ final class PrivacyMonitor: ObservableObject {
             if micNow { started.send(Start(mic: true, app: mic.app)) }
         }
         if micApp != mic.app { micApp = mic.app }
+        if micApps != mic.apps { micApps = mic.apps }
         if camera != cameraInUse {
             cameraInUse = camera
             if camera { started.send(Start(mic: false, app: nil)) }
@@ -66,23 +70,46 @@ final class PrivacyMonitor: ObservableObject {
 
     // MARK: - Micro
 
-    /// Utilisation du micro et nom de l'app qui l'utilise (macOS 14.2+), sinon état du micro par défaut.
-    private static func microphoneUsers() -> (inUse: Bool, app: String?) {
+    /// Processus système qui écoutent en permanence (« Dis Siri »…) : ignorés.
+    private static let ignoredProcesses: Set<String> = [
+        "corespeechd", "assistantd", "siriactionsd", "Siri", "SiriNCService", "heard", "com.apple.siri",
+    ]
+
+    /// Utilisation du micro et noms des apps qui l'utilisent (macOS 14.2+), sinon état du micro par défaut.
+    private static func microphoneUsers() -> (inUse: Bool, app: String?, apps: [String]) {
         if #available(macOS 14.2, *) {
             let processes: [AudioObjectID] = arrayProperty(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyProcessObjectList)
             let ownPID = ProcessInfo.processInfo.processIdentifier
+            var names: [String] = []
             for process in processes {
                 guard let running: UInt32 = scalarProperty(process, kAudioProcessPropertyIsRunningInput), running != 0 else { continue }
                 let pid: pid_t = scalarProperty(process, kAudioProcessPropertyPID) ?? 0
                 if pid == ownPID { continue }
-                let app = NSRunningApplication(processIdentifier: pid)
-                return (true, app?.localizedName)
+                let name = processName(pid)
+                if ignoredProcesses.contains(name) || ignoredProcesses.contains(where: { name.hasPrefix($0) && $0.contains(".") }) { continue }
+                if !names.contains(name) { names.append(name) }
             }
-            return (false, nil)
+            return (!names.isEmpty, names.first, names)
         }
         guard let device: AudioObjectID = scalarProperty(AudioObjectID(kAudioObjectSystemObject), kAudioHardwarePropertyDefaultInputDevice),
-              let running: UInt32 = scalarProperty(device, kAudioDevicePropertyDeviceIsRunningSomewhere) else { return (false, nil) }
-        return (running != 0, nil)
+              let running: UInt32 = scalarProperty(device, kAudioDevicePropertyDeviceIsRunningSomewhere) else { return (false, nil, []) }
+        return (running != 0, nil, [])
+    }
+
+    /// Nom lisible d'un processus : app (ou app parente d'un processus d'aide), sinon nom de l'exécutable.
+    private static func processName(_ pid: pid_t) -> String {
+        if let app = NSRunningApplication(processIdentifier: pid), let name = app.localizedName {
+            return name
+        }
+        var buffer = [CChar](repeating: 0, count: 4096)
+        guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return "Processus \(pid)" }
+        let path = String(cString: buffer)
+        // « …/Google Chrome.app/Contents/Frameworks/…/Helper » → « Google Chrome »
+        if let range = path.range(of: ".app/") {
+            let appPath = String(path[..<range.lowerBound])
+            return (appPath as NSString).lastPathComponent
+        }
+        return (path as NSString).lastPathComponent
     }
 
     private static func scalarProperty<T>(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector) -> T? {

@@ -7,11 +7,14 @@ final class LockScreenOverlay {
     static let shared = LockScreenOverlay()
 
     private var window: NSPanel?
+    private var screenID: CGDirectDisplayID?
+    private(set) var isVisible = false
 
-    func show() {
-        guard LockScreenSpace.shared.isAvailable,
-              let screen = NotchGeometry.targetScreen() else { return }
-        if window != nil { return }
+    /// Prépare la fenêtre à l'avance : en créer une pendant le verrouillage échoue parfois.
+    func prepare() {
+        guard let screen = NotchGeometry.targetScreen() else { return }
+        if window != nil, screenID == screen.displayID { return }
+        window?.orderOut(nil)
 
         let notch = NotchGeometry.notchSize(for: screen)
         let size = NSSize(width: 460, height: 150)
@@ -25,27 +28,49 @@ final class LockScreenOverlay {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
-        panel.level = .screenSaver
+        panel.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+        panel.canBecomeVisibleWithoutLogin = true
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
+        panel.alphaValue = 0
 
         let root = LockScreenIslandView(notch: notch, hasNotch: NotchGeometry.hasNotch(screen))
             .environmentObject(FaceUnlockService.shared)
         let hosting = NSHostingView(rootView: root)
         hosting.frame = NSRect(origin: .zero, size: size)
         panel.contentView = hosting
-        panel.setFrame(frame, display: true)
-        panel.orderFrontRegardless()
-        LockScreenSpace.shared.attach(panel)
+        panel.setFrame(frame, display: false)
         window = panel
+        screenID = screen.displayID
+    }
+
+    /// Affiche l'île sur l'écran verrouillé. Renvoie false si l'API système est indisponible.
+    @discardableResult
+    func show() -> Bool {
+        guard LockScreenSpace.shared.isAvailable else { return false }
+        prepare()
+        guard let window else { return false }
+        window.orderFrontRegardless()
+        LockScreenSpace.shared.attach(window)
+        window.alphaValue = 1
+        isVisible = true
+        return true
+    }
+
+    /// Rattache la fenêtre (le système la retire parfois après la mise en veille de l'écran).
+    func refresh() {
+        guard isVisible, let window else { return }
+        window.orderFrontRegardless()
+        LockScreenSpace.shared.attach(window)
     }
 
     func hide() {
         guard let window else { return }
+        isVisible = false
+        window.alphaValue = 0
         LockScreenSpace.shared.detach(window)
         window.orderOut(nil)
-        self.window = nil
     }
 }
 

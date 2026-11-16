@@ -14,8 +14,8 @@ struct FaceIdentity: Codable, Identifiable, Hashable {
     var centroid: [Float] { FaceMath.centroid(samples) }
 
     /// Similarité au centre du profil et au meilleur échantillon.
-    func score(_ embedding: [Float]) -> (centroid: Float, best: Float) {
-        let c = FaceMath.cosine(centroid, embedding)
+    func score(_ embedding: [Float], centroid cached: [Float]? = nil) -> (centroid: Float, best: Float) {
+        let c = FaceMath.cosine(cached ?? centroid, embedding)
         let best = samples.map { FaceMath.cosine($0, embedding) }.max() ?? 0
         return (c, best)
     }
@@ -24,7 +24,8 @@ struct FaceIdentity: Codable, Identifiable, Hashable {
     var suggestedThreshold: Double {
         guard samples.count >= 4 else { return 0.9 }
         var sims: [Float] = []
-        for i in samples.indices {
+        let stride = max(1, samples.count / 50)
+        for i in Swift.stride(from: 0, to: samples.count, by: stride) {
             var others = samples
             others.remove(at: i)
             sims.append(FaceMath.cosine(FaceMath.centroid(others), samples[i]))

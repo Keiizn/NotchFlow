@@ -61,6 +61,8 @@ final class FaceUnlockService: ObservableObject {
     @Published private(set) var enrollProgress: Double = 0
     @Published private(set) var enrollHint = ""
     @Published var lastError: String?
+    /// Diagnostic du dernier verrouillage (affiché dans les réglages).
+    @Published private(set) var lockDiagnostic: String?
 
     var isArmed: Bool {
         guard let armedUntil, secret != nil else { return false }
@@ -118,12 +120,16 @@ final class FaceUnlockService: ObservableObject {
         started = true
         hasPassword = FaceVault.hasPassword
         identities = FaceVault.loadIdentities()
+        LockScreenOverlay.shared.prepare()
+        NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { _ in
+            Task { @MainActor in LockScreenOverlay.shared.prepare() }
+        }
 
         let distributed = DistributedNotificationCenter.default()
         distributed.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(300))
-                if LockState.isLocked { self?.didLock() }
+                if LockState.reportedLocked ?? true { self?.didLock() }
             }
         }
         distributed.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
@@ -138,6 +144,7 @@ final class FaceUnlockService: ObservableObject {
             workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(600))
+                    LockScreenOverlay.shared.refresh()
                     self?.trigger()
                 }
             }
@@ -290,7 +297,7 @@ final class FaceUnlockService: ObservableObject {
         enrollSamples = []
     }
 
-    private static let enrollTarget = 24
+    static let enrollTarget = 200
 
     var enrollComplete: Bool { enrollSamples.count >= Self.enrollTarget }
 
@@ -319,20 +326,23 @@ final class FaceUnlockService: ObservableObject {
             enrollHint = "Rapproche-toi un peu"
             return
         }
-        guard sample.time - lastEnrollTime >= 0.25, !enrollComplete else { return }
+        guard sample.time - lastEnrollTime >= 0.09, !enrollComplete else { return }
         // Garde des prises de vue variées.
-        let similar = enrollSamples.contains { FaceMath.cosine($0, sample.embedding) > 0.995 }
+        let similar = enrollSamples.suffix(20).contains { FaceMath.cosine($0, sample.embedding) > 0.998 }
         if similar && enrollSamples.count > 4 { return }
         enrollSamples.append(sample.embedding)
         lastEnrollTime = sample.time
         enrollProgress = Double(enrollSamples.count) / Double(Self.enrollTarget)
-        switch enrollSamples.count {
-        case ..<6: enrollHint = "Regarde droit la caméra"
-        case ..<12: enrollHint = "Tourne doucement la tête à gauche et à droite"
-        case ..<18: enrollHint = "Lève et baisse légèrement le menton"
-        case ..<Self.enrollTarget: enrollHint = "Encore un instant…"
+        let count = enrollSamples.count
+        let step = "\(count) / \(Self.enrollTarget) — "
+        switch enrollProgress {
+        case ..<0.2: enrollHint = step + "Regarde droit la caméra"
+        case ..<0.45: enrollHint = step + "Tourne doucement la tête à gauche et à droite"
+        case ..<0.65: enrollHint = step + "Lève et baisse légèrement le menton"
+        case ..<0.85: enrollHint = step + "Fais quelques expressions (sourire, neutre)"
+        case ..<1: enrollHint = step + "Approche-toi puis recule un peu"
         default:
-            enrollHint = "Terminé !"
+            enrollHint = "Terminé ! \(count) prises enregistrées"
             stopCamera()
         }
     }
@@ -373,7 +383,13 @@ final class FaceUnlockService: ObservableObject {
         stopTest()
         cancelEnroll()
         phase = isArmed || !enabled ? .idle : .paused(pauseReason)
-        if enabled, showOnLockScreen { LockScreenOverlay.shared.show() }
+        var shown = false
+        if showOnLockScreen { shown = LockScreenOverlay.shared.show() }
+        let time = Date().formatted(date: .omitted, time: .shortened)
+        lockDiagnostic = "Dernier verrouillage détecté à \(time) — "
+            + (!showOnLockScreen ? "île désactivée"
+               : shown ? "île affichée"
+               : "API de l'écran verrouillé indisponible sur ce macOS")
         startMouseWatch()
     }
 

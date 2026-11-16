@@ -242,7 +242,7 @@ final class NotchViewModel: ObservableObject {
         case .event: 74
         case .stopwatch: 70
         case .download: 62
-        case .privacy: 22
+        case .privacy: privacy.micInUse ? 92 : 30
         case .hud(.reminder), .hud(.downloadDone): 130
         case .hud(.privacy), .hud(.device): 100
         case .hud: 86

@@ -6,8 +6,11 @@ struct AppsView: View {
     @EnvironmentObject private var settings: AppSettings
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            section(title: "Favoris") {
+        let others = launcher.running.filter { app in
+            !launcher.favorites.contains { $0.url.standardizedFileURL == app.bundleURL?.standardizedFileURL }
+        }
+        HStack(spacing: 10) {
+            card(title: "Favoris", icon: "star.fill", color: .yellow, count: launcher.favorites.count) {
                 ForEach(launcher.favorites) { item in
                     AppIconButton(
                         icon: launcher.icon(for: item.url),
@@ -26,24 +29,32 @@ struct AppsView: View {
                     }
                 }
                 Button { launcher.pickApps() } label: {
-                    VStack(spacing: 4) {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.3), style: StrokeStyle(lineWidth: 1.2, dash: [4, 3]))
-                            .frame(width: 36, height: 36)
-                            .overlay(Image(systemName: "plus").font(.system(size: 14, weight: .semibold)))
-                        Text("Ajouter").font(.system(size: 9.5)).foregroundStyle(.secondary)
+                    VStack(spacing: 5) {
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .fill(Color.white.opacity(0.08))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                    .strokeBorder(Color.white.opacity(0.35), style: StrokeStyle(lineWidth: 1.2, dash: [4, 3]))
+                            )
+                            .frame(width: 42, height: 42)
+                            .overlay(Image(systemName: "plus").font(.system(size: 15, weight: .bold)).foregroundStyle(.white))
+                        Text("Ajouter")
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.8))
                     }
-                    .frame(width: 54)
+                    .frame(width: 60)
                 }
                 .buttonStyle(PressableButtonStyle())
                 .help("Ajouter des applications aux favoris")
             }
 
-            let others = launcher.running.filter { app in
-                !launcher.favorites.contains { $0.url.standardizedFileURL == app.bundleURL?.standardizedFileURL }
-            }
-            if !others.isEmpty {
-                section(title: "Ouvertes") {
+            card(title: "Ouvertes", icon: "macwindow", color: .cyan, count: others.count) {
+                if others.isEmpty {
+                    Text("Aucune autre app ouverte")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .frame(height: 64)
+                } else {
                     ForEach(others, id: \.processIdentifier) { app in
                         AppIconButton(
                             icon: app.icon ?? NSImage(),
@@ -62,18 +73,37 @@ struct AppsView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    private func section<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title.uppercased())
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(.white.opacity(0.4))
+    private func card<Content: View>(title: String, icon: String, color: Color, count: Int,
+                                     @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 20, height: 20)
+                    .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(color.gradient))
+                Text(title)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(.white)
+                Spacer()
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.7))
+                        .padding(.horizontal, 6).padding(.vertical, 1)
+                        .background(Capsule().fill(Color.white.opacity(0.12)))
+                }
+            }
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) { content() }
+                HStack(spacing: 6) { content() }
+                    .padding(.vertical, 2)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard()
     }
 }
 
@@ -90,18 +120,21 @@ struct AppIconButton: View {
             VStack(spacing: 3) {
                 Image(nsImage: icon)
                     .resizable()
-                    .frame(width: 38, height: 38)
-                    .scaleEffect(hovering ? 1.12 : 1)
+                    .frame(width: 42, height: 42)
+                    .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+                    .scaleEffect(hovering ? 1.1 : 1)
                     .offset(y: hovering ? -2 : 0)
                 Text(name)
-                    .font(.system(size: 9.5))
+                    .font(.system(size: 10.5, weight: .medium))
                     .lineLimit(1)
-                    .foregroundStyle(.white.opacity(0.85))
+                    .truncationMode(.tail)
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.4), radius: 1)
                 Circle()
-                    .fill(Color.white.opacity(isRunning ? 0.7 : 0))
-                    .frame(width: 3.5, height: 3.5)
+                    .fill(Color.white.opacity(isRunning ? 0.85 : 0))
+                    .frame(width: 4, height: 4)
             }
-            .frame(width: 54)
+            .frame(width: 60)
         }
         .buttonStyle(PressableButtonStyle())
         .onHover { hovering = $0 }

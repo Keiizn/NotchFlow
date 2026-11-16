@@ -140,7 +140,7 @@ private struct GeneralSettings: View {
             } header: {
                 Text("Ouverture et fermeture")
             } footer: {
-                Text("Vous pouvez aussi cliquer sur le notch, ou y glisser un fichier pour ouvrir l'étagère.")
+                FooterText("Vous pouvez aussi cliquer sur le notch, ou y glisser un fichier pour ouvrir l'étagère.")
             }
 
             Section {
@@ -186,7 +186,7 @@ private struct AppearanceSettings: View {
             } header: {
                 Text("Forme")
             } footer: {
-                Text("« Dynamic Island » flotte sous le bord de l'écran sur les Mac sans notch.")
+                FooterText("« Dynamic Island » flotte sous le bord de l'écran sur les Mac sans notch.")
             }
 
             Section {
@@ -205,7 +205,7 @@ private struct AppearanceSettings: View {
             } header: {
                 Text("Matière")
             } footer: {
-                Text("Liquid Glass : verre dépoli translucide dans l'esprit de macOS Tahoe. Le notch fermé reste noir pour se fondre dans le notch matériel.")
+                FooterText("Liquid Glass : verre dépoli translucide dans l'esprit de macOS Tahoe. Le notch fermé reste noir pour se fondre dans le notch matériel.")
             }
 
             Section("Taille du notch ouvert") {
@@ -283,7 +283,7 @@ private struct ActivitiesSettings: View {
             } header: {
                 Text("Quand le notch est fermé")
             } footer: {
-                Text("Le minuteur et le chronomètre s'affichent toujours dans le notch quand ils sont lancés.")
+                FooterText("Le minuteur et le chronomètre s'affichent toujours dans le notch quand ils sont lancés.")
             }
 
             Section {
@@ -296,7 +296,7 @@ private struct ActivitiesSettings: View {
             } header: {
                 Text("Live Activities connectées")
             } footer: {
-                Text("Les téléchargements sont suivis dans le dossier Téléchargements : macOS demandera l'accès à ce dossier la première fois.")
+                FooterText("Les téléchargements sont suivis dans le dossier Téléchargements : macOS demandera l'accès à ce dossier la première fois.")
             }
         }
         .formStyle(.grouped)
@@ -342,7 +342,7 @@ private struct BatterySettings: View {
             } header: {
                 Text("Installation")
             } footer: {
-                Text("Pour limiter la charge, macOS exige des droits administrateur. NotchFlow installe un petit assistant (/usr/local/libexec/notchflow-smc) qui ne sait faire que « charge on/off » et « adaptateur on/off », autorisé sans mot de passe pour votre compte uniquement. Votre mot de passe est demandé une seule fois.")
+                FooterText("Pour limiter la charge, macOS exige des droits administrateur. NotchFlow installe un petit assistant (/usr/local/libexec/notchflow-smc) qui ne sait faire que « charge on/off » et « adaptateur on/off », autorisé sans mot de passe pour votre compte uniquement. Votre mot de passe est demandé une seule fois.")
             }
 
             Section {
@@ -373,7 +373,7 @@ private struct BatterySettings: View {
             } header: {
                 Text("Limite de charge")
             } footer: {
-                Text("Exemple : limite 80 %, marge 5 % → la charge s'arrête à 80 % et ne reprend que sous 75 %, ce qui évite les micro-recharges qui usent la batterie. Désactivez « Recharge optimisée » dans Réglages Système → Batterie pour éviter les conflits.")
+                FooterText("Exemple : limite 80 %, marge 5 % → la charge s'arrête à 80 % et ne reprend que sous 75 %, ce qui évite les micro-recharges qui usent la batterie. Désactivez « Recharge optimisée » dans Réglages Système → Batterie pour éviter les conflits.")
             }
 
             Section {
@@ -389,7 +389,7 @@ private struct BatterySettings: View {
             } header: {
                 Text("Veille")
             } footer: {
-                Text("Quand le Mac dort, NotchFlow ne peut plus arrêter la charge à la limite : sans précaution, la batterie monte à 100 % pendant la nuit. « Couper la charge » met la charge en pause avant la veille (elle reprend au réveil si besoin). « Rester éveillé » empêche la veille sur secteur tant que la limite n'est pas atteinte, puis coupe la charge. La décharge forcée est toujours arrêtée avant la veille.")
+                FooterText("Quand le Mac dort, NotchFlow ne peut plus arrêter la charge à la limite : sans précaution, la batterie monte à 100 % pendant la nuit. « Couper la charge » met la charge en pause avant la veille (elle reprend au réveil si besoin). « Rester éveillé » empêche la veille sur secteur tant que la limite n'est pas atteinte, puis coupe la charge. La décharge forcée est toujours arrêtée avant la veille.")
             }
 
             Section {
@@ -406,7 +406,7 @@ private struct BatterySettings: View {
             } header: {
                 Text("Protection")
             } footer: {
-                Text("La chaleur est l'ennemie n°1 des batteries lithium : la charge est mise en pause si la batterie dépasse la température choisie.")
+                FooterText("La chaleur est l'ennemie n°1 des batteries lithium : la charge est mise en pause si la batterie dépasse la température choisie.")
             }
 
             if manager.helperState == .ready {
@@ -419,7 +419,7 @@ private struct BatterySettings: View {
                 } header: {
                     Text("Diagnostic")
                 } footer: {
-                    Text("État lu directement dans le contrôleur de charge du Mac, toutes les 15 s. Si la charge reste « Autorisée » au-dessus de la limite, envoyez une capture de cette section.")
+                    FooterText("État lu directement dans le contrôleur de charge du Mac, toutes les 15 s. Si la charge reste « Autorisée » au-dessus de la limite, envoyez une capture de cette section.")
                 }
             }
 
@@ -482,7 +482,7 @@ private struct ControlsSettings: View {
             } header: {
                 Text("Volume et luminosité")
             } footer: {
-                Text("macOS demande l'autorisation « Accessibilité » pour intercepter ces touches. ⌥⇧ + touche = réglage fin. Après une mise à jour, il peut falloir réactiver NotchFlow dans Réglages Système → Confidentialité et sécurité → Accessibilité.")
+                FooterText("macOS demande l'autorisation « Accessibilité » pour intercepter ces touches. ⌥⇧ + touche = réglage fin. Après une mise à jour, il peut falloir réactiver NotchFlow dans Réglages Système → Confidentialité et sécurité → Accessibilité.")
             }
 
             Section {
@@ -500,7 +500,7 @@ private struct ControlsSettings: View {
             } header: {
                 Text("Gestes")
             } footer: {
-                Text("Les gestes fonctionnent sur le notch fermé et sur la barre du haut du notch ouvert.")
+                FooterText("Les gestes fonctionnent sur le notch fermé et sur la barre du haut du notch ouvert.")
             }
 
             Section {
@@ -550,6 +550,8 @@ private struct MusicSettings: View {
                     Text("• Safari : Réglages → Avancées → « Afficher les fonctionnalités pour les développeurs Web », puis menu Développement → « Autoriser JavaScript depuis les Apple Events ».")
                     Text("• Chrome / Brave / Edge : menu Affichage → Options pour les développeurs → « Autoriser JavaScript à partir des Apple Events ».")
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .multilineTextAlignment(.leading)
             }
         }
         .formStyle(.grouped)
@@ -576,7 +578,7 @@ private struct TabsSettings: View {
             } header: {
                 Text("Onglets du notch ouvert")
             } footer: {
-                Text("Les onglets sont répartis de chaque côté du notch. Au moins un onglet doit rester actif.")
+                FooterText("Les onglets sont répartis de chaque côté du notch. Au moins un onglet doit rester actif.")
             }
         }
         .formStyle(.grouped)
@@ -665,7 +667,7 @@ private struct WidgetsSettings: View {
             } header: {
                 Text("Météo")
             } footer: {
-                Text("Données Open-Meteo, sans compte ni clé API.")
+                FooterText("Données Open-Meteo, sans compte ni clé API.")
             }
 
             Section("Presse-papiers") {
@@ -685,7 +687,7 @@ private struct WidgetsSettings: View {
             } header: {
                 Text("Étagère & notes")
             } footer: {
-                Text("Clic droit sur un fichier de l'étagère → Convertir : images (PNG, JPEG, HEIC, TIFF, PDF), PDF (images, texte, fusion), documents (Word, RTF, HTML, ODT, texte, PDF), audio (AAC, WAV, AIFF), vidéo (MP4, MOV, 720p, extraction audio). Les fichiers créés sont ajoutés à l'étagère.")
+                FooterText("Clic droit sur un fichier de l'étagère → Convertir : images (PNG, JPEG, HEIC, TIFF, PDF), PDF (images, texte, fusion), documents (Word, RTF, HTML, ODT, texte, PDF), audio (AAC, WAV, AIFF), vidéo (MP4, MOV, 720p, extraction audio). Les fichiers créés sont ajoutés à l'étagère.")
             }
         }
         .formStyle(.grouped)
@@ -740,7 +742,7 @@ private struct WorldClockSettings: View {
         } header: {
             Text("Horloges mondiales (onglet Outils)")
         } footer: {
-            Text("Recherchez une grande ville en anglais (ex. « Los Angeles », « Sydney »).")
+            FooterText("Recherchez une grande ville en anglais (ex. « Los Angeles », « Sydney »).")
         }
     }
 }
@@ -810,7 +812,7 @@ private struct AboutSettings: View {
             } header: {
                 Text("Mises à jour")
             } footer: {
-                Text("La mise à jour est téléchargée depuis GitHub, installée, puis NotchFlow redémarre tout seul. macOS peut redemander certaines autorisations ensuite.")
+                FooterText("La mise à jour est téléchargée depuis GitHub, installée, puis NotchFlow redémarre tout seul. macOS peut redemander certaines autorisations ensuite.")
             }
 
             Section {
@@ -873,5 +875,21 @@ private struct SettingsRowLabel: View {
                 Text(subtitle).font(.caption).foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+/// Texte d'explication sous une section, sur toute la largeur (macOS 26 le centre sur une demi-largeur sinon).
+struct FooterText: View {
+    let text: String
+
+    init(_ text: String) {
+        self.text = text
+    }
+
+    var body: some View {
+        Text(text)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

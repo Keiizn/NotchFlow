@@ -7,9 +7,20 @@ enum LockState {
         (CGSessionCopyCurrentDictionary() as? [String: Any]) ?? [:]
     }
 
-    /// L'écran de la session courante est verrouillé.
+    /// L'écran de la session courante est verrouillé (nil si macOS ne fournit pas l'information).
+    static var reportedLocked: Bool? {
+        (session["CGSSessionScreenIsLocked"] as? NSNumber)?.boolValue
+    }
+
+    /// La fenêtre de connexion est au premier plan (écran verrouillé).
+    static var loginWindowFrontmost: Bool {
+        NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.loginwindow"
+    }
+
+    /// Vérification stricte avant de taper le mot de passe.
     static var isLocked: Bool {
-        (session["CGSSessionScreenIsLocked"] as? NSNumber)?.boolValue ?? false
+        if let reported = reportedLocked { return reported }
+        return loginWindowFrontmost
     }
 
     /// La session est celle affichée à l'écran (pas un changement rapide d'utilisateur).

@@ -70,8 +70,17 @@ struct CompactNotchView: View {
             .frame(width: 17, height: 17)
         case .privacy:
             if privacy.micInUse {
-                Circle().fill(Color.orange).frame(width: 7, height: 7)
-                    .help(privacy.micApp.map { "Micro utilisé par \($0)" } ?? "Micro utilisé")
+                HStack(spacing: 4) {
+                    Circle().fill(Color.orange).frame(width: 7, height: 7)
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.orange)
+                }
+                .help(privacy.micApps.isEmpty ? "Micro utilisé" : "Micro utilisé par " + privacy.micApps.joined(separator: ", "))
+            } else if privacy.cameraInUse {
+                Image(systemName: "video.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.green)
             }
         case .hud(let kind):
             hudLeading(kind)
@@ -117,13 +126,28 @@ struct CompactNotchView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         case .privacy:
-            if privacy.cameraInUse {
-                Circle().fill(Color.green).frame(width: 7, height: 7)
-                    .help("Caméra utilisée")
+            HStack(spacing: 4) {
+                if privacy.micInUse {
+                    Text(privacyLabel)
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(.orange)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                if privacy.cameraInUse {
+                    Circle().fill(Color.green).frame(width: 7, height: 7)
+                        .help("Caméra utilisée")
+                }
             }
         case .hud(let kind):
             hudTrailing(kind)
         }
+    }
+
+    /// « Discord », « Zoom +1 »…
+    private var privacyLabel: String {
+        guard let first = privacy.micApps.first else { return "Micro" }
+        return privacy.micApps.count > 1 ? "\(first) +\(privacy.micApps.count - 1)" : first
     }
 
     // MARK: - HUD

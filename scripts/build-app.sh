@@ -46,11 +46,17 @@ if [ -f Support/AppIcon.png ]; then
     || /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon" "${APP}/Contents/Info.plist"
 fi
 
-echo "▸ Signature ad hoc…"
-codesign --force --options runtime --sign - "${APP}/Contents/MacOS/notchflow-smc"
-codesign --force --deep --options runtime \
+# Signature : certificat stable si SIGN_IDENTITY est défini (les autorisations macOS
+# survivent alors aux mises à jour), sinon ad hoc.
+IDENTITY="${SIGN_IDENTITY:--}"
+if [ "${IDENTITY}" = "-" ]; then echo "▸ Signature ad hoc…"; else echo "▸ Signature avec le certificat NotchFlow…"; fi
+KEYCHAIN_ARGS=()
+if [ -n "${SIGN_KEYCHAIN:-}" ]; then KEYCHAIN_ARGS=(--keychain "${SIGN_KEYCHAIN}"); fi
+codesign --force --options runtime ${KEYCHAIN_ARGS[@]+"${KEYCHAIN_ARGS[@]}"} --sign "${IDENTITY}" "${APP}/Contents/MacOS/notchflow-smc"
+codesign --force --deep --options runtime ${KEYCHAIN_ARGS[@]+"${KEYCHAIN_ARGS[@]}"} \
   --entitlements Support/NotchFlow.entitlements \
-  --sign - "${APP}"
+  --sign "${IDENTITY}" "${APP}"
+codesign -dr - "${APP}" 2>&1 | tail -1
 
 lipo -info "${APP}/Contents/MacOS/NotchFlow"
 echo "✓ Terminé : ${APP}"
