@@ -52,7 +52,9 @@
     <string>NotchFlow convertit les fichiers que vous déposez dans l'étagère.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>NotchFlow détecte quand une app utilise le micro pour l'afficher dans le notch (il n'enregistre rien).</string>
+    <key>NSFaceIDUsageDescription</key>
+    <string>NotchFlow utilise Touch ID pour activer le déverrouillage facial.</string>
     <key>NSCameraUsageDescription</key>
-    <string>NotchFlow utilise la caméra pour la fonction Miroir.</string>
+    <string>NotchFlow utilise la caméra pour la fonction Miroir et, si vous l'activez, pour reconnaître votre visage sur l'écran verrouillé (analyse locale, aucune image enregistrée).</string>
 </dict>
 </plist>

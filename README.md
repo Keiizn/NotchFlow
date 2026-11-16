@@ -25,6 +25,16 @@ Le notch grossit légèrement au survol, s'ouvre au survol (délai réglable) ou
 - **Presse-papiers** : historique des 30 derniers textes copiés (les mots de passe des gestionnaires sont ignorés), clic = recopier.
 - **Miroir** : aperçu de la caméra avant une visio.
 
+### Nouveautés 1.7 — déverrouillage facial
+- **Déverrouille ton Mac en le regardant** avec la webcam, comme Face ID (Réglages → Déverrouillage facial).
+- **Île sur l'écran verrouillé** : elle s'anime pendant l'analyse, affiche « Bonjour, Prénom » puis ouvre la session ; touche-la pour relancer.
+- **Plusieurs visages** : toi avec ou sans lunettes, le soir, une autre personne… chaque profil peut être désactivé sans être supprimé.
+- **Détection du vivant** : mouvement de tête (léger) ou clignement des yeux (strict), refus des photos et écrans tenus devant la caméra.
+- **Session Touch ID** : le mot de passe n'est chargé qu'après Touch ID, pour une durée choisie (1 h à 7 jours).
+- **Labo de test** : score en direct pour régler le seuil de ressemblance.
+- 100 % local : empreintes chiffrées (AES-GCM, clé dans le trousseau), aucune image conservée, rien n'est envoyé sur Internet.
+- macOS n'a pas d'API pour ouvrir une session : NotchFlow tape le mot de passe enregistré (autorisation Accessibilité requise). Une webcam n'a pas de capteur de profondeur : c'est un confort, moins sûr que Touch ID.
+
 ### Nouveautés 1.5
 - **Live Activities connectées** : AirPods / casque / clavier Bluetooth à la connexion avec leur batterie, pastilles micro 🟠 / caméra 🟢 quand une app les utilise (avec le nom de l'app), progression des téléchargements (Safari, Chrome, Brave, Edge, Firefox…).
 - **Gestes** : balayer à deux doigts sur le notch = morceau suivant / précédent, défiler = volume.
@@ -102,7 +112,8 @@ L'app vit dans la barre des menus (icône ✨) — pas d'icône dans le Dock.
 | Automatisation (Spotify, Musique) | Lire le morceau en cours et piloter la lecture via AppleScript |
 | Calendriers | Afficher les événements |
 | Localisation | Météo locale (facultatif si tu choisis une ville) |
-| Caméra | Onglet Miroir |
+| Caméra | Onglet Miroir, déverrouillage facial |
+| Accessibilité | HUD natifs, saisie du mot de passe sur l'écran verrouillé |
 
 Si tu refuses par erreur : **Réglages Système → Confidentialité et sécurité**.
 

@@ -6,11 +6,12 @@ import ServiceManagement
 @MainActor
 struct SettingsView: View {
     enum Section: String, CaseIterable, Identifiable {
-        case general, appearance, activities, battery, controls, music, tabs, apps, widgets, about
+        case general, faceUnlock, appearance, activities, battery, controls, music, tabs, apps, widgets, about
         var id: String { rawValue }
         var title: String {
             switch self {
             case .general: "Général"
+            case .faceUnlock: "Déverrouillage facial"
             case .battery: "Batterie"
             case .appearance: "Apparence"
             case .activities: "Activités en direct"
@@ -25,6 +26,7 @@ struct SettingsView: View {
         var icon: String {
             switch self {
             case .general: "gearshape.fill"
+            case .faceUnlock: "faceid"
             case .appearance: "paintbrush.fill"
             case .activities: "waveform"
             case .controls: "keyboard.fill"
@@ -39,6 +41,7 @@ struct SettingsView: View {
         var color: Color {
             switch self {
             case .general: .gray
+            case .faceUnlock: .mint
             case .appearance: .purple
             case .activities: .pink
             case .controls: .cyan
@@ -75,6 +78,7 @@ struct SettingsView: View {
             Group {
                 switch selection ?? .general {
                 case .general: GeneralSettings()
+                case .faceUnlock: FaceUnlockSettings()
                 case .appearance: AppearanceSettings()
                 case .activities: ActivitiesSettings()
                 case .controls: ControlsSettings()

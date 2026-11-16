@@ -38,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PrivacyMonitor.shared.start()
         DownloadMonitor.shared.start()
         ScreenshotWatcher.shared.start()
+        FaceUnlockService.shared.start()
 
         setupStatusItem()
         NotchCoordinator.shared.start()
