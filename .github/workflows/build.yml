@@ -12,7 +12,8 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
+    # Runner Intel : les runners macOS ARM sont saturés ; le binaire reste universel.
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v5
         with:
