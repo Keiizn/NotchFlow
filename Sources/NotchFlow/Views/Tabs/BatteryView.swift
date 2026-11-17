@@ -131,7 +131,10 @@ struct BatteryView: View {
                     Button {
                         manager.session = manager.topUpActive ? .none : .topUp
                     } label: {
-                        Label(manager.topUpActive ? "Annuler 100 %" : "Charger à 100 %", systemImage: "bolt.fill")
+                        Label(manager.topUpActive ? "Annuler" : "Charger à 100 %",
+                              systemImage: manager.topUpActive ? "xmark" : "bolt.fill")
+                            .lineLimit(1)
+                            .fixedSize()
                     }
                     .buttonStyle(PillButtonStyle(tint: manager.topUpActive ? .orange : .white))
                     .disabled(!manager.topUpActive && battery.level >= 100)

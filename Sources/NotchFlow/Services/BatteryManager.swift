@@ -438,7 +438,7 @@ final class BatteryManager: ObservableObject {
             return "Le contrôleur de charge reste en pause malgré la commande. Touche « Rétablir la charge » ; si rien ne change, redémarre le Mac."
         }
         if notChargingReason != 0 {
-            return "Le Mac refuse de charger (raison \(String(format: "0x%X", notChargingReason))) : vérifie « Recharge optimisée » et la limite de charge dans Réglages Système → Batterie → ⓘ, ou un chargeur trop faible."
+            return "macOS bloque la charge (raison \(String(format: "0x%X", notChargingReason))). C'est presque toujours la « Limite de recharge » de macOS : mets-la à 100 % dans Réglages Système → Batterie → ⓘ, et laisse NotchFlow gérer la limite."
         }
         return "La batterie ne charge pas alors que la charge est autorisée : vérifie le chargeur (puissance) et « Recharge optimisée » dans Réglages Système → Batterie → ⓘ."
     }
