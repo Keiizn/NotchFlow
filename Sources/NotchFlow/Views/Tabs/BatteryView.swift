@@ -106,6 +106,11 @@ struct BatteryView: View {
                 .controlSize(.mini)
                 .tint(.green)
 
+                if !settings.chargeLimiterEnabled {
+                    Text("Charge normale, gérée par macOS")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                }
                 HStack(spacing: 8) {
                     Text("\(settings.chargeLimit) %")
                         .font(.system(size: 18, weight: .bold, design: .rounded))
@@ -117,7 +122,10 @@ struct BatteryView: View {
                         if value != settings.chargeLimit { settings.chargeLimit = value }
                     }
                 }
-                .opacity(settings.chargeLimiterEnabled ? 1 : 0.5)
+                .opacity(settings.chargeLimiterEnabled ? 1 : 0)
+                .frame(height: settings.chargeLimiterEnabled ? nil : 0)
+                .clipped()
+                .allowsHitTesting(settings.chargeLimiterEnabled)
 
                 HStack(spacing: 6) {
                     Button {
@@ -154,6 +162,12 @@ struct BatteryView: View {
                 if let warning = manager.stallWarning {
                     Text(warning).font(.system(size: 9.5)).foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        manager.restoreNormalCharging()
+                    } label: {
+                        Label("Rétablir la charge", systemImage: "arrow.counterclockwise")
+                    }
+                    .buttonStyle(PillButtonStyle(tint: .orange))
                 }
                 if let error = manager.lastError {
                     Text(error).font(.system(size: 9.5)).foregroundStyle(.orange).lineLimit(2)

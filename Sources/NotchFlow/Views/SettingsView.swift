@@ -421,7 +421,15 @@ private struct BatterySettings: View {
                     LabeledContent("Charge (SMC)") { smcLabel(manager.smcCharging, on: "Autorisée", off: "En pause") }
                     LabeledContent("Adaptateur (SMC)") { smcLabel(manager.smcAdapter, on: "Utilisé", off: "Coupé (décharge)") }
                     LabeledContent("Batterie", value: String(format: "%+.1f W", manager.health.batteryWatts))
-                    Button("Relire l'état") { manager.syncWithSMC() }
+                    LabeledContent("Raison de non-charge (macOS)",
+                                   value: manager.notChargingReason == 0 ? "Aucune" : String(format: "0x%X", manager.notChargingReason))
+                    if let warning = manager.stallWarning {
+                        Text(warning).font(.caption).foregroundStyle(.orange)
+                    }
+                    HStack {
+                        Button("Relire l'état") { manager.syncWithSMC() }
+                        Button("Rétablir la charge normale") { manager.restoreNormalCharging() }
+                    }
                     FooterText("État lu directement dans le contrôleur de charge du Mac, toutes les 15 s. Si la charge reste « Autorisée » au-dessus de la limite, envoyez une capture de cette section.")
                 } header: {
                     Text("Diagnostic")

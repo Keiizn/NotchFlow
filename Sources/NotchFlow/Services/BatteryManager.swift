@@ -81,6 +81,10 @@ final class BatteryManager: ObservableObject {
     @Published private(set) var stallWarning: String?
     private var stallSince: Date?
     private var retriedStall = false
+    /// NotchFlow pilotait la charge au dernier passage (pour tout rétablir quand on coupe le limiteur).
+    private var wasManaging = false
+    /// Raison de non-charge donnée par le chargeur (IOKit « ChargerData », 0 = aucune).
+    @Published private(set) var notChargingReason = 0
     @Published private(set) var lastError: String?
     /// Clés SMC utilisées et état réel lu dans le SMC (diagnostic).
     @Published private(set) var smcKeys = ""
@@ -314,14 +318,25 @@ final class BatteryManager: ObservableObject {
         let manual = session != .none && helperState == .ready
 
         guard isLimiterActive || manual else {
-            // Limiteur coupé : on rend la main à macOS si on avait modifié l'état.
-            if helperState == .ready && (chargingInhibited || adapterDisabled) {
+            // Limiteur coupé : on rend la main à macOS. Au moment de la coupure, on renvoie
+            // toutes les commandes (l'état mémorisé peut être faux après une veille).
+            if helperState == .ready && wasManaging {
+                wasManaging = false
+                clearStall()
+                forceApply(charging: true, adapter: true)
+            } else if helperState == .ready && (chargingInhibited || adapterDisabled) {
                 apply(charging: true, adapter: true)
+            } else if plugged && helperState == .ready {
+                // On vérifie que la batterie charge vraiment sous 95 %.
+                checkStall(expectCharge: level < 95 && !battery.isCharging, expectDischarge: false,
+                           charging: true, adapter: true)
+            } else {
+                clearStall()
             }
             mode = plugged ? (battery.isCharging ? .charging : (level >= 100 ? .full : .notManaged)) : .onBattery
-            clearStall()
             return
         }
+        wasManaging = true
 
         if session == .topUp && level >= 100 {
             session = .none   // relance evaluate() via didSet
@@ -403,6 +418,7 @@ final class BatteryManager: ObservableObject {
     /// qui retient la charge à 80 %…). On mesure le courant réel de la batterie : sans effet
     /// au bout de 45 s, on renvoie les commandes ; au bout de 2 min, on explique pourquoi.
     private func checkStall(expectCharge: Bool, expectDischarge: Bool, charging: Bool, adapter: Bool) {
+        guard helperState == .ready else { clearStall(); return }
         let amps = health.amperage
         let stalled = (expectCharge && amps <= 0.02) || (expectDischarge && amps >= -0.02)
         guard stalled else { clearStall(); return }
@@ -412,10 +428,27 @@ final class BatteryManager: ObservableObject {
             retriedStall = true
             forceApply(charging: charging, adapter: adapter)
         } else if elapsed >= 120 && stallWarning == nil {
-            stallWarning = expectCharge
-                ? "macOS retient la charge. Coupe « Recharge optimisée » (et la limite de charge de macOS) dans Réglages Système → Batterie → ⓘ, puis réessaie."
+            stallWarning = expectCharge ? chargeStallMessage
                 : "Le Mac n'a pas coupé l'adaptateur : la décharge sur secteur ne fonctionne pas sur ce modèle. Débranche le câble pour décharger."
         }
+    }
+
+    private var chargeStallMessage: String {
+        if smcCharging == "disabled" {
+            return "Le contrôleur de charge reste en pause malgré la commande. Touche « Rétablir la charge » ; si rien ne change, redémarre le Mac."
+        }
+        if notChargingReason != 0 {
+            return "Le Mac refuse de charger (raison \(String(format: "0x%X", notChargingReason))) : vérifie « Recharge optimisée » et la limite de charge dans Réglages Système → Batterie → ⓘ, ou un chargeur trop faible."
+        }
+        return "La batterie ne charge pas alors que la charge est autorisée : vérifie le chargeur (puissance) et « Recharge optimisée » dans Réglages Système → Batterie → ⓘ."
+    }
+
+    /// Bouton « Rétablir la charge » : annule toute action et rend la charge normale à macOS.
+    func restoreNormalCharging() {
+        guard helperState == .ready else { return }
+        session = .none
+        clearStall()
+        forceApply(charging: true, adapter: true)
     }
 
     /// Renvoie toutes les commandes au SMC, même si l'état mémorisé semble déjà bon.
@@ -522,6 +555,10 @@ final class BatteryManager: ObservableObject {
         h.temperature = Double(int("Temperature")) / 100
         h.voltage = Double(int("Voltage")) / 1000
         h.amperage = Double((dict["Amperage"] as? NSNumber)?.int64Value ?? 0) / 1000
+        if let charger = dict["ChargerData"] as? [String: Any] {
+            let reason = (charger["NotChargingReason"] as? NSNumber)?.intValue ?? 0
+            if reason != notChargingReason { notChargingReason = reason }
+        }
         if let adapter = dict["AdapterDetails"] as? [String: Any] {
             h.adapterWatts = (adapter["Watts"] as? NSNumber)?.intValue ?? 0
             h.adapterName = adapter["Name"] as? String ?? ""
