@@ -121,27 +121,50 @@ struct BatteryView: View {
 
                 HStack(spacing: 6) {
                     Button {
-                        manager.topUpActive.toggle()
+                        manager.session = manager.topUpActive ? .none : .topUp
                     } label: {
                         Label(manager.topUpActive ? "Annuler 100 %" : "Charger à 100 %", systemImage: "bolt.fill")
                     }
                     .buttonStyle(PillButtonStyle(tint: manager.topUpActive ? .orange : .white))
-                    .disabled(!settings.chargeLimiterEnabled)
+                    .disabled(!manager.topUpActive && battery.level >= 100)
 
-                    Button {
-                        settings.dischargeToLimit.toggle()
-                    } label: {
-                        Label("Décharger", systemImage: settings.dischargeToLimit ? "arrow.down.circle.fill" : "arrow.down.circle")
+                    if let target = manager.dischargeTarget {
+                        Button {
+                            manager.session = .none
+                        } label: {
+                            Label("Arrêter (\(target) %)", systemImage: "stop.circle.fill")
+                        }
+                        .buttonStyle(PillButtonStyle(tint: .blue))
+                    } else {
+                        Menu {
+                            ForEach(dischargeTargets, id: \.self) { target in
+                                Button("Jusqu'à \(target) %") { manager.session = .discharge(target: target) }
+                            }
+                        } label: {
+                            Label("Décharger", systemImage: "arrow.down.circle")
+                        }
+                        .menuStyle(.button)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                        .buttonStyle(PillButtonStyle(tint: .white))
+                        .disabled(dischargeTargets.isEmpty || !battery.isPluggedIn)
+                        .help(battery.isPluggedIn ? "Utilise la batterie même branché, jusqu'au niveau choisi" : "Branche le Mac pour forcer la décharge")
                     }
-                    .buttonStyle(PillButtonStyle(tint: settings.dischargeToLimit ? .blue : .white))
-                    .help("Décharge la batterie jusqu'à la limite même branché")
-                    .disabled(!settings.chargeLimiterEnabled)
+                }
+                if let warning = manager.stallWarning {
+                    Text(warning).font(.system(size: 9.5)).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 if let error = manager.lastError {
                     Text(error).font(.system(size: 9.5)).foregroundStyle(.orange).lineLimit(2)
                 }
             }
         }
+    }
+
+    /// Niveaux proposés pour la décharge (sous le niveau actuel).
+    private var dischargeTargets: [Int] {
+        [80, 70, 60, 50, 40, 30, 20].filter { $0 < battery.level }
     }
 
     // MARK: - Santé
@@ -172,10 +195,11 @@ struct BatteryView: View {
     private var modeText: String {
         switch manager.mode {
         case .onBattery: battery.minutesRemaining.map { "Sur batterie · \($0 / 60) h \($0 % 60)" } ?? "Sur batterie"
-        case .charging: manager.isLimiterActive ? "En charge jusqu'à \(manager.topUpActive ? 100 : settings.chargeLimit) %" : "En charge"
+        case .charging: manager.topUpActive ? "En charge jusqu'à 100 %" : (manager.isLimiterActive ? "En charge jusqu'à \(settings.chargeLimit) %" : "En charge")
+        case .limitReached where manager.dischargeTarget != nil: "Maintenue à \(manager.dischargeTarget ?? 0) %"
         case .limitReached: "Limite atteinte · alimenté par le secteur"
         case .sailing: "En pause · reprise sous \(settings.chargeLimit - settings.sailingRange) %"
-        case .discharging: "Décharge vers \(settings.chargeLimit) %"
+        case .discharging: "Décharge vers \(manager.dischargeTarget ?? settings.chargeLimit) %"
         case .tooHot: "Pause : batterie chaude"
         case .full: "Chargée"
         case .notManaged: battery.isPluggedIn ? "Branché" : "Sur batterie"

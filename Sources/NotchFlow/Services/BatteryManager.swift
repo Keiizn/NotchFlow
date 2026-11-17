@@ -55,8 +55,32 @@ final class BatteryManager: ObservableObject {
     @Published private(set) var chargingInhibited = false
     @Published private(set) var adapterDisabled = false
     @Published private(set) var mode: Mode = .notManaged
-    /// Charge ponctuelle jusqu'à 100 % (ignore la limite jusqu'au plein).
-    @Published var topUpActive = false { didSet { evaluate() } }
+    /// Action ponctuelle lancée depuis le notch : charge à 100 % ou décharge vers un niveau.
+    enum Session: Equatable {
+        case none
+        case topUp
+        case discharge(target: Int)
+    }
+
+    @Published var session: Session = .none {
+        didSet {
+            guard session != oldValue else { return }
+            stallSince = nil
+            retriedStall = false
+            stallWarning = nil
+            evaluate()
+        }
+    }
+    /// Compatibilité : charge ponctuelle à 100 %.
+    var topUpActive: Bool { session == .topUp }
+    var dischargeTarget: Int? {
+        if case .discharge(let target) = session { return target }
+        return nil
+    }
+    /// Le Mac n'obéit pas à la commande (charge ou décharge sans effet mesurable).
+    @Published private(set) var stallWarning: String?
+    private var stallSince: Date?
+    private var retriedStall = false
     @Published private(set) var lastError: String?
     /// Clés SMC utilisées et état réel lu dans le SMC (diagnostic).
     @Published private(set) var smcKeys = ""
@@ -234,7 +258,7 @@ final class BatteryManager: ObservableObject {
             runHelperSync(["adapter", "on"])
             adapterDisabled = false
         }
-        guard isLimiterActive, !topUpActive else { return }
+        guard isLimiterActive || dischargeTarget != nil, !topUpActive else { return }
         switch settings.sleepCharging {
         case .stop, .preventSleep:
             // Sinon le Mac chargerait jusqu'à 100 % pendant la nuit.
@@ -285,38 +309,58 @@ final class BatteryManager: ObservableObject {
         }
         let level = battery.level
         // Adaptateur coupé par NotchFlow : macOS croit le Mac débranché, mais il ne l'est pas.
-        // On continue donc la décharge jusqu'à la limite (si on débranche entre-temps, c'est sans effet).
+        // On continue donc la décharge jusqu'à la cible (si on débranche entre-temps, c'est sans effet).
         let plugged = battery.isPluggedIn || adapterDisabled
+        let manual = session != .none && helperState == .ready
 
-        guard isLimiterActive else {
+        guard isLimiterActive || manual else {
             // Limiteur coupé : on rend la main à macOS si on avait modifié l'état.
             if helperState == .ready && (chargingInhibited || adapterDisabled) {
                 apply(charging: true, adapter: true)
             }
             mode = plugged ? (battery.isCharging ? .charging : (level >= 100 ? .full : .notManaged)) : .onBattery
+            clearStall()
             return
         }
 
-        if topUpActive && level >= 100 {
-            topUpActive = false   // relance evaluate() via didSet
+        if session == .topUp && level >= 100 {
+            session = .none   // relance evaluate() via didSet
             return
         }
 
-        let limit = topUpActive ? 100 : settings.chargeLimit
-        let resumeBelow = topUpActive ? 100 : max(limit - settings.sailingRange, 5)
-        let tooHot = settings.heatProtection && health.temperature >= settings.heatLimit && !topUpActive
+        let limit: Int
+        let resumeBelow: Int
+        switch session {
+        case .topUp:
+            limit = 100
+            resumeBelow = 100
+        case .discharge(let target):
+            limit = target
+            resumeBelow = max(target - settings.sailingRange, 5)
+        case .none:
+            limit = settings.chargeLimit
+            resumeBelow = max(limit - settings.sailingRange, 5)
+        }
+        let tooHot = settings.heatProtection && health.temperature >= settings.heatLimit && session != .topUp
 
         guard plugged else {
             // Sur batterie : rien à piloter, mais on relâche la décharge forcée.
             if adapterDisabled { apply(charging: !chargingInhibited, adapter: true) }
             mode = .onBattery
+            clearStall()
             return
         }
 
         var wantCharging = !chargingInhibited
         var wantAdapter = true
+        let forcedDischarge: Bool
+        switch session {
+        case .discharge: forcedDischarge = level > limit
+        case .topUp: forcedDischarge = false
+        case .none: forcedDischarge = settings.dischargeToLimit && level > limit
+        }
 
-        if settings.dischargeToLimit && !topUpActive && level > limit {
+        if forcedDischarge {
             wantCharging = false
             wantAdapter = false
             mode = .discharging
@@ -324,12 +368,12 @@ final class BatteryManager: ObservableObject {
             wantCharging = false
             mode = .tooHot
         } else if level >= limit {
-            if !chargingInhibited && !topUpActive && lastError == nil {
+            if !chargingInhibited && session == .none && lastError == nil {
                 limitReached.send(limit)
             }
             wantCharging = false
             mode = limit >= 100 ? .full : .limitReached
-        } else if level <= resumeBelow {
+        } else if level <= resumeBelow || session == .topUp {
             wantCharging = true
             mode = .charging
         } else {
@@ -339,6 +383,61 @@ final class BatteryManager: ObservableObject {
 
         if wantCharging == chargingInhibited || wantAdapter == adapterDisabled {
             apply(charging: wantCharging, adapter: wantAdapter)
+        } else {
+            // L'état SMC est celui voulu : on vérifie que la batterie réagit vraiment.
+            checkStall(expectCharge: wantCharging && wantAdapter && level < 97 && mode == .charging,
+                       expectDischarge: !wantAdapter,
+                       charging: wantCharging, adapter: wantAdapter)
+        }
+    }
+
+    // MARK: - Vérification de l'effet réel
+
+    private func clearStall() {
+        stallSince = nil
+        retriedStall = false
+        if stallWarning != nil { stallWarning = nil }
+    }
+
+    /// Le SMC peut accepter une commande sans effet (firmware, « Recharge optimisée » de macOS
+    /// qui retient la charge à 80 %…). On mesure le courant réel de la batterie : sans effet
+    /// au bout de 45 s, on renvoie les commandes ; au bout de 2 min, on explique pourquoi.
+    private func checkStall(expectCharge: Bool, expectDischarge: Bool, charging: Bool, adapter: Bool) {
+        let amps = health.amperage
+        let stalled = (expectCharge && amps <= 0.02) || (expectDischarge && amps >= -0.02)
+        guard stalled else { clearStall(); return }
+        guard let since = stallSince else { stallSince = Date(); return }
+        let elapsed = Date().timeIntervalSince(since)
+        if elapsed >= 45 && !retriedStall {
+            retriedStall = true
+            forceApply(charging: charging, adapter: adapter)
+        } else if elapsed >= 120 && stallWarning == nil {
+            stallWarning = expectCharge
+                ? "macOS retient la charge. Coupe « Recharge optimisée » (et la limite de charge de macOS) dans Réglages Système → Batterie → ⓘ, puis réessaie."
+                : "Le Mac n'a pas coupé l'adaptateur : la décharge sur secteur ne fonctionne pas sur ce modèle. Débranche le câble pour décharger."
+        }
+    }
+
+    /// Renvoie toutes les commandes au SMC, même si l'état mémorisé semble déjà bon.
+    private func forceApply(charging: Bool, adapter: Bool) {
+        isApplying = true
+        Task {
+            if adapter {
+                battery.suppressEventsUntil = Date().addingTimeInterval(8)
+                _ = await Self.run("/usr/bin/sudo", ["-n", Self.installedHelper, "adapter", "on"])
+            }
+            _ = await Self.run("/usr/bin/sudo", ["-n", Self.installedHelper, "charging", charging ? "on" : "off"])
+            if !adapter {
+                battery.suppressEventsUntil = Date().addingTimeInterval(8)
+                _ = await Self.run("/usr/bin/sudo", ["-n", Self.installedHelper, "adapter", "off"])
+            }
+            let status = await Self.run(Self.installedHelper, ["status"])
+            if status.status == 0 { readStatus(status.output) }
+            isApplying = false
+            if pendingEvaluate {
+                pendingEvaluate = false
+                evaluate()
+            }
         }
     }
 

@@ -369,7 +369,7 @@ private struct BatterySettings: View {
                         Text("\(settings.sailingRange) %").monospacedDigit().frame(width: 48, alignment: .trailing)
                     }
                 }
-                Toggle("Décharger jusqu'à la limite quand le Mac est branché", isOn: $settings.dischargeToLimit)
+                Toggle("Décharger automatiquement jusqu'à la limite quand le Mac est branché", isOn: $settings.dischargeToLimit)
             } header: {
                 Text("Limite de charge")
             } footer: {
@@ -546,12 +546,10 @@ private struct MusicSettings: View {
                 Text("Navigateurs")
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Pour que NotchFlow puisse lire et piloter la lecture, autorisez le JavaScript depuis les événements Apple :")
-                    Text("• Safari : Réglages → Avancées → « Afficher les fonctionnalités pour les développeurs Web », puis menu Développement → « Autoriser JavaScript depuis les Apple Events ».")
-                    Text("• Chrome / Brave / Edge : menu Affichage → Options pour les développeurs → « Autoriser JavaScript à partir des Apple Events ».")
+                    FooterText("Pour que NotchFlow puisse lire et piloter la lecture, autorisez le JavaScript depuis les événements Apple :")
+                    FooterText("• Safari : Réglages → Avancées → « Afficher les fonctionnalités pour les développeurs Web », puis menu Développement → « Autoriser JavaScript depuis les Apple Events ».")
+                    FooterText("• Chrome / Brave / Edge : menu Affichage → Options pour les développeurs → « Autoriser JavaScript à partir des Apple Events ».")
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .multilineTextAlignment(.leading)
             }
         }
         .formStyle(.grouped)
@@ -886,10 +884,16 @@ struct FooterText: View {
         self.text = text
     }
 
+    /// Marges latérales d'un Form « grouped » (≈ 20 pt de chaque côté).
+    private static let formInsets: CGFloat = 40
+
     var body: some View {
         Text(text)
             .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // Le pied de section reçoit une largeur réduite : on impose celle du formulaire.
+            .containerRelativeFrame(.horizontal, alignment: .leading) { width, _ in
+                max(width - Self.formInsets, 200)
+            }
     }
 }
