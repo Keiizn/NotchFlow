@@ -75,6 +75,8 @@ final class MediaController: ObservableObject {
     @Published private(set) var source: MediaSource?
     @Published private(set) var artwork: NSImage?
     @Published private(set) var accentColor: Color = .white
+    /// Couleurs gauche / droite de la pochette pour le halo Ambilight.
+    @Published private(set) var ambientColors: [Color] = [.white, .white]
     @Published private(set) var position: Double = 0
     private var positionDate = Date()
 
@@ -234,6 +236,7 @@ final class MediaController: ObservableObject {
         artworkKey = nil
         browserArtworkURL = nil
         accentColor = .white
+        ambientColors = [.white, .white]
     }
 
     private func periodicSync() {
@@ -433,6 +436,7 @@ final class MediaController: ObservableObject {
         guard artworkKey == key else { return }
         artwork = image
         accentColor = Color(nsColor: image?.accentColor ?? .white)
+        ambientColors = image?.edgeColors?.map { Color(nsColor: $0) } ?? [accentColor, accentColor]
     }
 
     // MARK: - AppleScript

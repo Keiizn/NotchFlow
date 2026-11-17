@@ -27,6 +27,15 @@ struct NotchRootView: View {
             glass: settings.theme == .glass,
             glassTint: settings.glassTint
         ))
+        // Halo Ambilight de la musique : couleurs de la pochette, pulse en rythme.
+        .background(alignment: .top) {
+            if ambilightOn {
+                AmbilightGlow(colors: media.ambientColors, intensity: settings.glowIntensity,
+                              size: size, cornerRadius: vm.bottomRadius)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.6), value: ambilightOn)
         .shadow(color: .black.opacity(vm.isOpen && settings.showShadow ? 0.4 : 0), radius: 22, y: 10)
         // Halo de la Live Activity : le notch fermé « s'allume » de la couleur de l'activité.
         .shadow(color: glow.opacity(!vm.isOpen && settings.activityGlow ? settings.glowIntensity : 0),
@@ -47,11 +56,17 @@ struct NotchRootView: View {
         }
     }
 
+    private var ambilightOn: Bool {
+        guard !vm.isOpen, settings.activityGlow, settings.musicGlowReactive, media.isPlaying else { return false }
+        if case .music = vm.activity { return true }
+        return false
+    }
+
     /// Couleur du halo selon l'activité affichée (transparent si rien).
     private var glow: Color {
         switch vm.activity {
         case .none: .clear
-        case .music: media.isPlaying ? media.accentColor : .clear
+        case .music: media.isPlaying && !settings.musicGlowReactive ? media.accentColor : .clear
         case .timer: .orange
         case .event: .blue
         case .stopwatch: .cyan

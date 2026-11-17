@@ -229,8 +229,9 @@ private struct AppearanceSettings: View {
                             Text("\(Int(settings.glowIntensity * 100)) %").monospacedDigit().frame(width: 44, alignment: .trailing)
                         }
                     }
+                    Toggle("Ambilight : pulser au rythme de la musique", isOn: $settings.musicGlowReactive)
                 }
-                FooterText("Le notch fermé s'éclaire de la couleur de l'activité : pochette de l'album, orange pour le minuteur et le micro, vert pour la charge…")
+                FooterText("Le notch fermé s'éclaire de la couleur de l'activité : orange pour le minuteur et le micro, vert pour la charge… En mode Ambilight, il reprend les couleurs de la pochette et bat au rythme du son (macOS demande l'accès « Enregistrement audio du système » ; rien n'est enregistré).")
             } header: {
                 Text("Halo")
             }

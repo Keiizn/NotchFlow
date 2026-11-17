@@ -50,6 +50,8 @@
     <string>NotchFlow ajoute vos captures d'écran et convertit les fichiers de l'étagère.</string>
     <key>NSDocumentsFolderUsageDescription</key>
     <string>NotchFlow convertit les fichiers que vous déposez dans l'étagère.</string>
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>NotchFlow écoute le niveau sonore de la musique pour faire pulser le halo du notch en rythme (rien n'est enregistré).</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>NotchFlow détecte quand une app utilise le micro pour l'afficher dans le notch (il n'enregistre rien).</string>
     <key>NSFaceIDUsageDescription</key>
