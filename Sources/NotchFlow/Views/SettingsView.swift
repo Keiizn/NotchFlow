@@ -56,7 +56,6 @@ struct SettingsView: View {
     }
 
     @State private var selection: Section? = .general
-    @State private var detailWidth: CGFloat = 0
 
     var body: some View {
         NavigationSplitView {
@@ -92,9 +91,6 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle((selection ?? .general).title)
-            // Largeur réelle de la page : les textes d'explication s'y alignent.
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { detailWidth = $0 }
-            .environment(\.settingsPageWidth, detailWidth)
         }
         .frame(minWidth: 720, minHeight: 500)
     }
@@ -141,10 +137,9 @@ private struct GeneralSettings: View {
                 }
                 Toggle("Fermer en cliquant ailleurs", isOn: $settings.closeOnClickOutside)
                 Toggle("Retour haptique (trackpad)", isOn: $settings.haptics)
+                FooterText("Vous pouvez aussi cliquer sur le notch, ou y glisser un fichier pour ouvrir l'étagère.")
             } header: {
                 Text("Ouverture et fermeture")
-            } footer: {
-                FooterText("Vous pouvez aussi cliquer sur le notch, ou y glisser un fichier pour ouvrir l'étagère.")
             }
 
             Section {
@@ -187,10 +182,9 @@ private struct AppearanceSettings: View {
                     Text("Dynamic Island").tag(AppSettings.Style.island)
                 }
                 .pickerStyle(.segmented)
+                FooterText("« Dynamic Island » flotte sous le bord de l'écran sur les Mac sans notch.")
             } header: {
                 Text("Forme")
-            } footer: {
-                FooterText("« Dynamic Island » flotte sous le bord de l'écran sur les Mac sans notch.")
             }
 
             Section {
@@ -206,10 +200,9 @@ private struct AppearanceSettings: View {
                         }
                     }
                 }
+                FooterText("Liquid Glass : verre dépoli translucide dans l'esprit de macOS Tahoe. Le notch fermé reste noir pour se fondre dans le notch matériel.")
             } header: {
                 Text("Matière")
-            } footer: {
-                FooterText("Liquid Glass : verre dépoli translucide dans l'esprit de macOS Tahoe. Le notch fermé reste noir pour se fondre dans le notch matériel.")
             }
 
             Section("Taille du notch ouvert") {
@@ -237,10 +230,9 @@ private struct AppearanceSettings: View {
                         }
                     }
                 }
+                FooterText("Le notch fermé s'éclaire de la couleur de l'activité : pochette de l'album, orange pour le minuteur et le micro, vert pour la charge…")
             } header: {
                 Text("Halo")
-            } footer: {
-                FooterText("Le notch fermé s'éclaire de la couleur de l'activité : pochette de l'album, orange pour le minuteur et le micro, vert pour la charge…")
             }
 
             Section("Effets") {
@@ -300,10 +292,9 @@ private struct ActivitiesSettings: View {
                 row("Chargeur", "Animation au branchement / débranchement", "bolt.fill", .green, $settings.showBatteryActivity)
                 row("Volume & luminosité", "HUD avec curseur lors d'un changement", "speaker.wave.2.fill", .blue, $settings.showVolumeHUD)
                 row("Rappel à échéance", "Le titre du rappel s'affiche autour du notch", "checklist", .orange, $settings.showReminderActivity)
+                FooterText("Le minuteur et le chronomètre s'affichent toujours dans le notch quand ils sont lancés.")
             } header: {
                 Text("Quand le notch est fermé")
-            } footer: {
-                FooterText("Le minuteur et le chronomètre s'affichent toujours dans le notch quand ils sont lancés.")
             }
 
             Section {
@@ -313,10 +304,9 @@ private struct ActivitiesSettings: View {
                 if settings.showDownloadActivity {
                     Toggle("Ajouter les téléchargements terminés à l'étagère", isOn: $settings.downloadsToShelf)
                 }
+                FooterText("Les téléchargements sont suivis dans le dossier Téléchargements : macOS demandera l'accès à ce dossier la première fois.")
             } header: {
                 Text("Live Activities connectées")
-            } footer: {
-                FooterText("Les téléchargements sont suivis dans le dossier Téléchargements : macOS demandera l'accès à ce dossier la première fois.")
             }
         }
         .formStyle(.grouped)
@@ -359,10 +349,9 @@ private struct BatterySettings: View {
                 if let error = manager.lastError {
                     Text(error).font(.caption).foregroundStyle(.orange)
                 }
+                FooterText("Pour limiter la charge, macOS exige des droits administrateur. NotchFlow installe un petit assistant (/usr/local/libexec/notchflow-smc) qui ne sait faire que « charge on/off » et « adaptateur on/off », autorisé sans mot de passe pour votre compte uniquement. Votre mot de passe est demandé une seule fois.")
             } header: {
                 Text("Installation")
-            } footer: {
-                FooterText("Pour limiter la charge, macOS exige des droits administrateur. NotchFlow installe un petit assistant (/usr/local/libexec/notchflow-smc) qui ne sait faire que « charge on/off » et « adaptateur on/off », autorisé sans mot de passe pour votre compte uniquement. Votre mot de passe est demandé une seule fois.")
             }
 
             Section {
@@ -390,10 +379,9 @@ private struct BatterySettings: View {
                     }
                 }
                 Toggle("Décharger automatiquement jusqu'à la limite quand le Mac est branché", isOn: $settings.dischargeToLimit)
+                FooterText("Exemple : limite 80 %, marge 5 % → la charge s'arrête à 80 % et ne reprend que sous 75 %, ce qui évite les micro-recharges qui usent la batterie. Désactivez « Recharge optimisée » dans Réglages Système → Batterie pour éviter les conflits.")
             } header: {
                 Text("Limite de charge")
-            } footer: {
-                FooterText("Exemple : limite 80 %, marge 5 % → la charge s'arrête à 80 % et ne reprend que sous 75 %, ce qui évite les micro-recharges qui usent la batterie. Désactivez « Recharge optimisée » dans Réglages Système → Batterie pour éviter les conflits.")
             }
 
             Section {
@@ -406,10 +394,9 @@ private struct BatterySettings: View {
                     Label("Veille bloquée jusqu'à \(settings.chargeLimit) %", systemImage: "moon.zzz.fill")
                         .font(.caption).foregroundStyle(.orange)
                 }
+                FooterText("Quand le Mac dort, NotchFlow ne peut plus arrêter la charge à la limite : sans précaution, la batterie monte à 100 % pendant la nuit. « Couper la charge » met la charge en pause avant la veille (elle reprend au réveil si besoin). « Rester éveillé » empêche la veille sur secteur tant que la limite n'est pas atteinte, puis coupe la charge. La décharge forcée est toujours arrêtée avant la veille.")
             } header: {
                 Text("Veille")
-            } footer: {
-                FooterText("Quand le Mac dort, NotchFlow ne peut plus arrêter la charge à la limite : sans précaution, la batterie monte à 100 % pendant la nuit. « Couper la charge » met la charge en pause avant la veille (elle reprend au réveil si besoin). « Rester éveillé » empêche la veille sur secteur tant que la limite n'est pas atteinte, puis coupe la charge. La décharge forcée est toujours arrêtée avant la veille.")
             }
 
             Section {
@@ -423,10 +410,9 @@ private struct BatterySettings: View {
                     }
                 }
                 Toggle("Rétablir la charge normale quand NotchFlow se ferme", isOn: $settings.restoreChargingOnQuit)
+                FooterText("La chaleur est l'ennemie n°1 des batteries lithium : la charge est mise en pause si la batterie dépasse la température choisie.")
             } header: {
                 Text("Protection")
-            } footer: {
-                FooterText("La chaleur est l'ennemie n°1 des batteries lithium : la charge est mise en pause si la batterie dépasse la température choisie.")
             }
 
             if manager.helperState == .ready {
@@ -436,10 +422,9 @@ private struct BatterySettings: View {
                     LabeledContent("Adaptateur (SMC)") { smcLabel(manager.smcAdapter, on: "Utilisé", off: "Coupé (décharge)") }
                     LabeledContent("Batterie", value: String(format: "%+.1f W", manager.health.batteryWatts))
                     Button("Relire l'état") { manager.syncWithSMC() }
+                    FooterText("État lu directement dans le contrôleur de charge du Mac, toutes les 15 s. Si la charge reste « Autorisée » au-dessus de la limite, envoyez une capture de cette section.")
                 } header: {
                     Text("Diagnostic")
-                } footer: {
-                    FooterText("État lu directement dans le contrôleur de charge du Mac, toutes les 15 s. Si la charge reste « Autorisée » au-dessus de la limite, envoyez une capture de cette section.")
                 }
             }
 
@@ -499,10 +484,9 @@ private struct ControlsSettings: View {
                         }
                     }
                 }
+                FooterText("macOS demande l'autorisation « Accessibilité » pour intercepter ces touches. ⌥⇧ + touche = réglage fin. Après une mise à jour, il peut falloir réactiver NotchFlow dans Réglages Système → Confidentialité et sécurité → Accessibilité.")
             } header: {
                 Text("Volume et luminosité")
-            } footer: {
-                FooterText("macOS demande l'autorisation « Accessibilité » pour intercepter ces touches. ⌥⇧ + touche = réglage fin. Après une mise à jour, il peut falloir réactiver NotchFlow dans Réglages Système → Confidentialité et sécurité → Accessibilité.")
             }
 
             Section {
@@ -517,10 +501,9 @@ private struct ControlsSettings: View {
                                      icon: "speaker.wave.2.fill", color: .blue)
                 }
                 .disabled(!settings.gesturesEnabled)
+                FooterText("Les gestes fonctionnent sur le notch fermé et sur la barre du haut du notch ouvert.")
             } header: {
                 Text("Gestes")
-            } footer: {
-                FooterText("Les gestes fonctionnent sur le notch fermé et sur la barre du haut du notch ouvert.")
             }
 
             Section {
@@ -562,14 +545,13 @@ private struct MusicSettings: View {
                                      subtitle: "YouTube, Deezer, SoundCloud, Spotify Web… dans Safari, Chrome, Brave, Edge",
                                      icon: "globe", color: .blue)
                 }
-            } header: {
-                Text("Navigateurs")
-            } footer: {
                 VStack(alignment: .leading, spacing: 4) {
                     FooterText("Pour que NotchFlow puisse lire et piloter la lecture, autorisez le JavaScript depuis les événements Apple :")
                     FooterText("• Safari : Réglages → Avancées → « Afficher les fonctionnalités pour les développeurs Web », puis menu Développement → « Autoriser JavaScript depuis les Apple Events ».")
                     FooterText("• Chrome / Brave / Edge : menu Affichage → Options pour les développeurs → « Autoriser JavaScript à partir des Apple Events ».")
                 }
+            } header: {
+                Text("Navigateurs")
             }
         }
         .formStyle(.grouped)
@@ -593,10 +575,9 @@ private struct TabsSettings: View {
                         SettingsRowLabel(title: tab.title, subtitle: tab.subtitle, icon: tab.icon, color: .blue)
                     }
                 }
+                FooterText("Les onglets sont répartis de chaque côté du notch. Au moins un onglet doit rester actif.")
             } header: {
                 Text("Onglets du notch ouvert")
-            } footer: {
-                FooterText("Les onglets sont répartis de chaque côté du notch. Au moins un onglet doit rester actif.")
             }
         }
         .formStyle(.grouped)
@@ -682,10 +663,9 @@ private struct WidgetsSettings: View {
                 .pickerStyle(.segmented)
                 .onChange(of: settings.useFahrenheit) { _, _ in WeatherService.shared.refresh() }
                 Button("Actualiser maintenant") { WeatherService.shared.refresh() }
+                FooterText("Données Open-Meteo, sans compte ni clé API.")
             } header: {
                 Text("Météo")
-            } footer: {
-                FooterText("Données Open-Meteo, sans compte ni clé API.")
             }
 
             Section("Presse-papiers") {
@@ -702,10 +682,9 @@ private struct WidgetsSettings: View {
                 }
                 Button("Vider l'étagère") { ShelfStore.shared.clear() }
                 Button("Effacer les notes rapides", role: .destructive) { NotesStore.shared.clear() }
+                FooterText("Clic droit sur un fichier de l'étagère → Convertir : images (PNG, JPEG, HEIC, TIFF, PDF), PDF (images, texte, fusion), documents (Word, RTF, HTML, ODT, texte, PDF), audio (AAC, WAV, AIFF), vidéo (MP4, MOV, 720p, extraction audio). Les fichiers créés sont ajoutés à l'étagère.")
             } header: {
                 Text("Étagère & notes")
-            } footer: {
-                FooterText("Clic droit sur un fichier de l'étagère → Convertir : images (PNG, JPEG, HEIC, TIFF, PDF), PDF (images, texte, fusion), documents (Word, RTF, HTML, ODT, texte, PDF), audio (AAC, WAV, AIFF), vidéo (MP4, MOV, 720p, extraction audio). Les fichiers créés sont ajoutés à l'étagère.")
             }
         }
         .formStyle(.grouped)
@@ -757,10 +736,9 @@ private struct WorldClockSettings: View {
                 }
                 .buttonStyle(.borderless)
             }
+            FooterText("Recherchez une grande ville en anglais (ex. « Los Angeles », « Sydney »).")
         } header: {
             Text("Horloges mondiales (onglet Outils)")
-        } footer: {
-            FooterText("Recherchez une grande ville en anglais (ex. « Los Angeles », « Sydney »).")
         }
     }
 }
@@ -827,10 +805,9 @@ private struct AboutSettings: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
+                FooterText("La mise à jour est téléchargée depuis GitHub, installée, puis NotchFlow redémarre tout seul. macOS peut redemander certaines autorisations ensuite.")
             } header: {
                 Text("Mises à jour")
-            } footer: {
-                FooterText("La mise à jour est téléchargée depuis GitHub, installée, puis NotchFlow redémarre tout seul. macOS peut redemander certaines autorisations ensuite.")
             }
 
             Section {
@@ -896,7 +873,7 @@ private struct SettingsRowLabel: View {
     }
 }
 
-/// Texte d'explication sous une section, sur toute la largeur (macOS 26 le centre sur une demi-largeur sinon).
+/// Texte d'explication, affiché comme dernière ligne de la section (pleine largeur de la carte).
 struct FooterText: View {
     let text: String
 
@@ -904,29 +881,12 @@ struct FooterText: View {
         self.text = text
     }
 
-    @Environment(\.settingsPageWidth) private var pageWidth
-
-    /// Marges d'un Form « grouped » (≈ 20 pt de chaque côté) + barre de défilement.
-    private static let formInsets: CGFloat = 48
-
     var body: some View {
-        // Le pied de section reçoit une largeur réduite : on impose celle de la page.
         Text(text)
+            .font(.callout)
+            .foregroundStyle(.secondary)
             .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
-            .frame(width: pageWidth > 200 ? pageWidth - Self.formInsets : nil, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct SettingsPageWidthKey: EnvironmentKey {
-    static let defaultValue: CGFloat = 0
-}
-
-extension EnvironmentValues {
-    /// Largeur de la page de réglages affichée (0 si inconnue).
-    var settingsPageWidth: CGFloat {
-        get { self[SettingsPageWidthKey.self] }
-        set { self[SettingsPageWidthKey.self] = newValue }
     }
 }

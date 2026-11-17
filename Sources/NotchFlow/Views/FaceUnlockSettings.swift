@@ -42,7 +42,6 @@ struct FaceUnlockSettings: View {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
                         .font(.caption).foregroundStyle(.orange)
                 }
-            } footer: {
                 FooterText("Tout reste sur ce Mac : les visages sont convertis en empreintes chiffrées (AES-GCM), les images ne sont jamais enregistrées. Une webcam n'a pas de capteur de profondeur : c'est plus pratique mais moins sûr que Touch ID. Après chaque mise à jour, macOS peut redemander les autorisations Caméra et Accessibilité.")
             }
 
@@ -107,10 +106,9 @@ struct FaceUnlockSettings: View {
                             .disabled(password.isEmpty || savingPassword)
                     }
                 }
+                FooterText("macOS ne permet pas à une app d'ouvrir la session : quand ton visage est reconnu, NotchFlow tape ce mot de passe à ta place. Il est vérifié, rangé dans le trousseau et n'est chargé en mémoire qu'après Touch ID, pour la durée de session choisie.")
             } header: {
                 Text("Mot de passe")
-            } footer: {
-                FooterText("macOS ne permet pas à une app d'ouvrir la session : quand ton visage est reconnu, NotchFlow tape ce mot de passe à ta place. Il est vérifié, rangé dans le trousseau et n'est chargé en mémoire qu'après Touch ID, pour la durée de session choisie.")
             }
 
             Section {
@@ -155,10 +153,9 @@ struct FaceUnlockSettings: View {
                     Label("Ajouter un visage…", systemImage: "plus.circle.fill")
                 }
                 .disabled(cameraStatus != .authorized)
+                FooterText("Ajoute plusieurs profils pour toi (avec lunettes, le soir, avec un bonnet…) ou pour une autre personne. Désactive un profil sans le supprimer avec l'interrupteur.")
             } header: {
                 Text("Visages")
-            } footer: {
-                FooterText("Ajoute plusieurs profils pour toi (avec lunettes, le soir, avec un bonnet…) ou pour une autre personne. Désactive un profil sans le supprimer avec l'interrupteur.")
             }
 
             Section {
@@ -184,10 +181,9 @@ struct FaceUnlockSettings: View {
                     }
                 }
                 Toggle("Redemander Touch ID automatiquement à l'expiration", isOn: $face.autoRearm)
+                FooterText("Plus le seuil est haut, plus la reconnaissance est stricte. Utilise le test ci-dessous, avec toi puis avec une autre personne ou une photo : règle le seuil entre ton score et le sien. La détection du vivant refuse les photos immobiles (léger) ou exige un clignement des yeux (strict) ; une vidéo peut toutefois la tromper.")
             } header: {
                 Text("Sécurité")
-            } footer: {
-                FooterText("Plus le seuil est haut, plus la reconnaissance est stricte. Utilise le test ci-dessous, avec toi puis avec une autre personne ou une photo : règle le seuil entre ton score et le sien. La détection du vivant refuse les photos immobiles (léger) ou exige un clignement des yeux (strict) ; une vidéo peut toutefois la tromper.")
             }
 
             Section {
@@ -217,10 +213,9 @@ struct FaceUnlockSettings: View {
                         }
                     }
                 }
+                FooterText("Le test n'ouvre rien : il affiche le score en direct de chaque visage enregistré.")
             } header: {
                 Text("Test")
-            } footer: {
-                FooterText("Le test n'ouvre rien : il affiche le score en direct de chaque visage enregistré.")
             }
 
             Section {
@@ -238,10 +233,9 @@ struct FaceUnlockSettings: View {
                         Text("\(Int(face.scanSeconds)) s").monospacedDigit().frame(width: 34)
                     }
                 }
+                FooterText("L'analyse démarre au réveil de l'écran, quand la souris bouge ou quand tu touches l'île. Pendant les 4 secondes qui suivent le verrouillage, rien ne se déclenche, pour te laisser le temps de partir.")
             } header: {
                 Text("Écran verrouillé")
-            } footer: {
-                FooterText("L'analyse démarre au réveil de l'écran, quand la souris bouge ou quand tu touches l'île. Pendant les 4 secondes qui suivent le verrouillage, rien ne se déclenche, pour te laisser le temps de partir.")
             }
 
             Section {
