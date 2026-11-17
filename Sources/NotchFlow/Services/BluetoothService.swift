@@ -19,6 +19,9 @@ final class BluetoothService: NSObject {
 
     private var connectNotification: IOBluetoothUserNotification?
     private var startedAt = Date()
+    /// Dernière annonce par appareil, et heure de connexion (anti-clignotement).
+    private var lastAnnounced: [String: (connected: Bool, date: Date)] = [:]
+    private var connectedSince: [String: Date] = [:]
 
     private override init() { super.init() }
 
@@ -53,11 +56,26 @@ final class BluetoothService: NSObject {
     private struct Info: Sendable {
         let name: String
         let icon: String
+        /// Appareil reconnu (écouteurs, clavier, souris, manette…). Les autres — montre,
+        /// iPhone en Continuity, objets connectés — se reconnectent sans cesse en arrière-plan.
+        var known: Bool { icon != Self.genericIcon }
+        static let genericIcon = "dot.radiowaves.left.and.right"
     }
 
     private func handle(_ info: Info, connected: Bool) {
+        let now = Date()
+        if connected {
+            connectedSince[info.name] = now
+        }
         // Les appareils déjà connectés au démarrage ne déclenchent pas d'animation.
-        guard Date().timeIntervalSince(startedAt) > 4 else { return }
+        guard now.timeIntervalSince(startedAt) > 4, info.known else { return }
+        if !connected {
+            // Déconnexion juste après une connexion : simple reconnexion automatique.
+            if let since = connectedSince.removeValue(forKey: info.name), now.timeIntervalSince(since) < 30 { return }
+        }
+        // Même annonce pour le même appareil il y a moins de 10 min : on se tait.
+        if let last = lastAnnounced[info.name], last.connected == connected, now.timeIntervalSince(last.date) < 600 { return }
+        lastAnnounced[info.name] = (connected, now)
         events.send(Event(name: info.name, icon: info.icon, battery: nil, connected: connected))
         guard connected else { return }
         // La batterie n'est connue de macOS qu'une ou deux secondes après la connexion.
@@ -92,7 +110,7 @@ final class BluetoothService: NSObject {
             if minor & 0x10 != 0 { return "keyboard" }
             if minor & 0x20 != 0 { return "computermouse.fill" }
             return "gamecontroller.fill"
-        default: return "dot.radiowaves.left.and.right"
+        default: return Info.genericIcon
         }
     }
 

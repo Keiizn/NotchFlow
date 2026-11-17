@@ -282,7 +282,7 @@ struct CompactNotchView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(.blue)
-        case .device(_, _, let battery, let connected):
+        case .device(let name, _, let battery, let connected):
             if let battery, connected {
                 HStack(spacing: 3) {
                     Text("\(battery) %").font(.system(size: 12, weight: .semibold)).monospacedDigit()
@@ -291,9 +291,15 @@ struct CompactNotchView: View {
                 }
                 .foregroundStyle(.white)
             } else {
-                Text(connected ? "Connecté" : "Déconnecté")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(connected ? Color.white : Color.white.opacity(0.6))
+                HStack(spacing: 5) {
+                    Circle().fill(connected ? Color.green : Color.white.opacity(0.35)).frame(width: 6, height: 6)
+                    Text(name)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(connected ? Color.white : Color.white.opacity(0.6))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .help(connected ? "\(name) connecté" : "\(name) déconnecté")
             }
         case .privacy(let mic, let app):
             Text(app ?? (mic ? "Micro" : "Caméra"))
