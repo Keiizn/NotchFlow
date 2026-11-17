@@ -29,7 +29,8 @@ struct NotchRootView: View {
         ))
         .shadow(color: .black.opacity(vm.isOpen && settings.showShadow ? 0.4 : 0), radius: 22, y: 10)
         // Halo de la Live Activity : le notch fermé « s'allume » de la couleur de l'activité.
-        .shadow(color: glow.opacity(!vm.isOpen && settings.showShadow ? 0.5 : 0), radius: 9, y: 2)
+        .shadow(color: glow.opacity(!vm.isOpen && settings.activityGlow ? settings.glowIntensity : 0),
+                radius: 5 + 10 * settings.glowIntensity, y: 2)
         .animation(.easeInOut(duration: 0.5), value: glow)
         .padding(.top, vm.topOffset)
         .contentShape(Rectangle())

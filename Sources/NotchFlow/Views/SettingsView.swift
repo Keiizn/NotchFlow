@@ -56,6 +56,7 @@ struct SettingsView: View {
     }
 
     @State private var selection: Section? = .general
+    @State private var detailWidth: CGFloat = 0
 
     var body: some View {
         NavigationSplitView {
@@ -91,6 +92,9 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle((selection ?? .general).title)
+            // Largeur réelle de la page : les textes d'explication s'y alignent.
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { detailWidth = $0 }
+            .environment(\.settingsPageWidth, detailWidth)
         }
         .frame(minWidth: 720, minHeight: 500)
     }
@@ -221,6 +225,22 @@ private struct AppearanceSettings: View {
                         Text("\(Int(settings.openHeight)) pt").monospacedDigit().frame(width: 52, alignment: .trailing)
                     }
                 }
+            }
+
+            Section {
+                Toggle("Halo coloré pendant les activités", isOn: $settings.activityGlow)
+                if settings.activityGlow {
+                    LabeledContent("Intensité") {
+                        HStack {
+                            Slider(value: $settings.glowIntensity, in: 0.2...1, step: 0.1)
+                            Text("\(Int(settings.glowIntensity * 100)) %").monospacedDigit().frame(width: 44, alignment: .trailing)
+                        }
+                    }
+                }
+            } header: {
+                Text("Halo")
+            } footer: {
+                FooterText("Le notch fermé s'éclaire de la couleur de l'activité : pochette de l'album, orange pour le minuteur et le micro, vert pour la charge…")
             }
 
             Section("Effets") {
@@ -884,16 +904,29 @@ struct FooterText: View {
         self.text = text
     }
 
-    /// Marges latérales d'un Form « grouped » (≈ 20 pt de chaque côté).
-    private static let formInsets: CGFloat = 40
+    @Environment(\.settingsPageWidth) private var pageWidth
+
+    /// Marges d'un Form « grouped » (≈ 20 pt de chaque côté) + barre de défilement.
+    private static let formInsets: CGFloat = 48
 
     var body: some View {
+        // Le pied de section reçoit une largeur réduite : on impose celle de la page.
         Text(text)
             .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
-            // Le pied de section reçoit une largeur réduite : on impose celle du formulaire.
-            .containerRelativeFrame(.horizontal, alignment: .leading) { width, _ in
-                max(width - Self.formInsets, 200)
-            }
+            .frame(width: pageWidth > 200 ? pageWidth - Self.formInsets : nil, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct SettingsPageWidthKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
+extension EnvironmentValues {
+    /// Largeur de la page de réglages affichée (0 si inconnue).
+    var settingsPageWidth: CGFloat {
+        get { self[SettingsPageWidthKey.self] }
+        set { self[SettingsPageWidthKey.self] = newValue }
     }
 }

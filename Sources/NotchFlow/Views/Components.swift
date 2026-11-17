@@ -266,11 +266,13 @@ struct BatteryBadge: View {
             Text("\(battery.level)%")
                 .font(.system(size: 11, weight: .medium))
                 .monospacedDigit()
+                .lineLimit(1)
                 .foregroundStyle(.white.opacity(0.85))
             Image(systemName: battery.symbolName)
                 .font(.system(size: 13))
                 .foregroundStyle(color)
         }
+        .fixedSize()
         .help(battery.minutesRemaining.map { "Environ \($0 / 60) h \($0 % 60) min restantes" } ?? "Batterie")
     }
 

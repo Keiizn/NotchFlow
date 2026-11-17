@@ -32,6 +32,8 @@ final class AppSettings: ObservableObject {
         static let showShadow = "showShadow"
         static let hoverGrow = "hoverGrow"
         static let showBatteryInHeader = "showBatteryInHeader"
+        static let activityGlow = "activityGlow"
+        static let glowIntensity = "glowIntensity"
         static let autoCheckUpdates = "autoCheckUpdates"
         static let autoInstallUpdates = "autoInstallUpdates"
         static let theme = "theme"
@@ -127,6 +129,10 @@ final class AppSettings: ObservableObject {
     @Published var showShadow: Bool { didSet { store(showShadow, Keys.showShadow) } }
     @Published var hoverGrow: Bool { didSet { store(hoverGrow, Keys.hoverGrow) } }
     @Published var showBatteryInHeader: Bool { didSet { store(showBatteryInHeader, Keys.showBatteryInHeader) } }
+    /// Halo coloré autour du notch fermé pendant une Live Activity.
+    @Published var activityGlow: Bool { didSet { store(activityGlow, Keys.activityGlow) } }
+    /// Intensité du halo (0,2…1).
+    @Published var glowIntensity: Double { didSet { store(glowIntensity, Keys.glowIntensity) } }
 
     func isTabEnabled(_ id: String) -> Bool { enabledTabs.contains(id) }
 
@@ -142,7 +148,7 @@ final class AppSettings: ObservableObject {
         for key in [Keys.style, Keys.openOnHover, Keys.hoverDelay, Keys.haptics, Keys.openWidth, Keys.openHeight,
                     Keys.showMusicActivity, Keys.showBatteryActivity, Keys.showVolumeHUD, Keys.showEventActivity,
                     Keys.showCalendar, Keys.showWeather, Keys.useFahrenheit, Keys.clipboardEnabled,
-                    Keys.enabledTabs, Keys.closeOnClickOutside, Keys.showShadow, Keys.hoverGrow, Keys.showBatteryInHeader] {
+                    Keys.enabledTabs, Keys.closeOnClickOutside, Keys.showShadow, Keys.hoverGrow, Keys.showBatteryInHeader, Keys.activityGlow, Keys.glowIntensity] {
             UserDefaults.standard.removeObject(forKey: key)
         }
         let d = UserDefaults.standard
@@ -156,6 +162,7 @@ final class AppSettings: ObservableObject {
         showCalendar = true; showWeather = true; useFahrenheit = false; clipboardEnabled = true
         enabledTabs = Self.defaultTabs
         closeOnClickOutside = true; showShadow = true; hoverGrow = true; showBatteryInHeader = true
+        activityGlow = true; glowIntensity = 0.5
     }
 
     private static func defaultFavoriteApps() -> [String] {
@@ -219,6 +226,8 @@ final class AppSettings: ObservableObject {
             Keys.showShadow: true,
             Keys.hoverGrow: true,
             Keys.showBatteryInHeader: true,
+            Keys.activityGlow: true,
+            Keys.glowIntensity: 0.5,
             Keys.autoCheckUpdates: true,
             Keys.autoInstallUpdates: true,
             Keys.openHeight: 170.0,
@@ -253,6 +262,8 @@ final class AppSettings: ObservableObject {
         showShadow = d.bool(forKey: Keys.showShadow)
         hoverGrow = d.bool(forKey: Keys.hoverGrow)
         showBatteryInHeader = d.bool(forKey: Keys.showBatteryInHeader)
+        activityGlow = d.bool(forKey: Keys.activityGlow)
+        glowIntensity = min(max(d.double(forKey: Keys.glowIntensity), 0.2), 1)
         autoCheckUpdates = d.bool(forKey: Keys.autoCheckUpdates)
         autoInstallUpdates = d.bool(forKey: Keys.autoInstallUpdates)
         theme = Theme(rawValue: d.string(forKey: Keys.theme) ?? "") ?? .glass
