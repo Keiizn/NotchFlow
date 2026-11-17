@@ -87,32 +87,52 @@ struct HeaderBar: View {
     }
 
     /// Pilule en verre derrière les onglets (thème Liquid Glass).
-    @ViewBuilder
     private var tabPill: some View {
-        if settings.theme == .glass {
-            Capsule()
-                .fill(Color.white.opacity(0.06))
-                .overlay(Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.6))
-        }
+        let glass = settings.theme == .glass
+        return Capsule()
+            .fill(Color.white.opacity(glass ? 0.06 : 0.045))
+            .overlay(Capsule().strokeBorder(Color.white.opacity(glass ? 0.12 : 0.07), lineWidth: 0.6))
     }
 
     private func tabButton(_ tab: NotchViewModel.Tab) -> some View {
-        Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.tab = tab }
-        } label: {
+        TabIconButton(tab: tab, selected: vm.tab == tab, namespace: tabNamespace) {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) { vm.tab = tab }
+        }
+    }
+}
+
+/// Onglet de la barre du haut : survol éclairé, onglet actif en pilule lumineuse.
+@MainActor
+private struct TabIconButton: View {
+    let tab: NotchViewModel.Tab
+    let selected: Bool
+    let namespace: Namespace.ID
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
             Image(systemName: tab.icon)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 11, weight: selected ? .bold : .semibold))
                 .frame(width: 27, height: 22)
-                .foregroundStyle(vm.tab == tab ? Color.white : Color.white.opacity(0.45))
+                .foregroundStyle(selected ? Color.white : Color.white.opacity(hovering ? 0.8 : 0.45))
                 .background {
-                    if vm.tab == tab {
+                    if selected {
                         Capsule()
-                            .fill(Color.white.opacity(0.14))
-                            .matchedGeometryEffect(id: "tab", in: tabNamespace)
+                            .fill(LinearGradient(colors: [.white.opacity(0.24), .white.opacity(0.12)],
+                                                 startPoint: .top, endPoint: .bottom))
+                            .overlay(Capsule().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5))
+                            .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+                            .matchedGeometryEffect(id: "tab", in: namespace)
+                    } else if hovering {
+                        Capsule().fill(Color.white.opacity(0.07))
                     }
                 }
+                .symbolEffect(.bounce, value: selected)
         }
         .buttonStyle(PressableButtonStyle())
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.15), value: hovering)
         .help(tab.title)
     }
 }

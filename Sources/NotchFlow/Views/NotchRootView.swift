@@ -5,6 +5,8 @@ import UniformTypeIdentifiers
 struct NotchRootView: View {
     @EnvironmentObject private var vm: NotchViewModel
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var media: MediaController
+    @ObservedObject private var privacy = PrivacyMonitor.shared
     @Namespace private var ns
 
     var body: some View {
@@ -26,6 +28,9 @@ struct NotchRootView: View {
             glassTint: settings.glassTint
         ))
         .shadow(color: .black.opacity(vm.isOpen && settings.showShadow ? 0.4 : 0), radius: 22, y: 10)
+        // Halo de la Live Activity : le notch fermé « s'allume » de la couleur de l'activité.
+        .shadow(color: glow.opacity(!vm.isOpen && settings.showShadow ? 0.5 : 0), radius: 9, y: 2)
+        .animation(.easeInOut(duration: 0.5), value: glow)
         .padding(.top, vm.topOffset)
         .contentShape(Rectangle())
         .onTapGesture { if !vm.isOpen { vm.open() } }
@@ -38,6 +43,28 @@ struct NotchRootView: View {
         .environment(\.colorScheme, .dark)
         .onChange(of: vm.isDropTargeted) { _, targeted in
             if targeted { vm.open(tab: .shelf) }
+        }
+    }
+
+    /// Couleur du halo selon l'activité affichée (transparent si rien).
+    private var glow: Color {
+        switch vm.activity {
+        case .none: .clear
+        case .music: media.isPlaying ? media.accentColor : .clear
+        case .timer: .orange
+        case .event: .blue
+        case .stopwatch: .cyan
+        case .download: .blue
+        case .privacy: privacy.micInUse ? .orange : .green
+        case .hud(let kind):
+            switch kind {
+            case .charging, .chargeLimited: .green
+            case .timerDone, .reminder: .orange
+            case .update, .downloadDone: .blue
+            case .brightness: .yellow
+            case .privacy(let mic, _): mic ? .orange : .green
+            default: .white.opacity(0.5)
+            }
         }
     }
 

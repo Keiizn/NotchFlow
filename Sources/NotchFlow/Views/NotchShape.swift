@@ -14,30 +14,37 @@ struct NotchShape: Shape {
     func path(in rect: CGRect) -> Path {
         let top = min(topRadius, rect.width / 4)
         let bottom = min(bottomRadius, (rect.width - 2 * top) / 2, rect.height - top)
+        // Coins « continus » (squircle) : la courbure varie progressivement
+        // au lieu de casser net comme un arc de cercle.
+        let k: CGFloat = 0.62
         var p = Path()
         p.move(to: CGPoint(x: rect.minX, y: rect.minY))
         // Oreille gauche
-        p.addQuadCurve(
+        p.addCurve(
             to: CGPoint(x: rect.minX + top, y: rect.minY + top),
-            control: CGPoint(x: rect.minX + top, y: rect.minY)
+            control1: CGPoint(x: rect.minX + top * k, y: rect.minY),
+            control2: CGPoint(x: rect.minX + top, y: rect.minY + top * (1 - k))
         )
         p.addLine(to: CGPoint(x: rect.minX + top, y: rect.maxY - bottom))
         // Coin bas gauche
-        p.addQuadCurve(
+        p.addCurve(
             to: CGPoint(x: rect.minX + top + bottom, y: rect.maxY),
-            control: CGPoint(x: rect.minX + top, y: rect.maxY)
+            control1: CGPoint(x: rect.minX + top, y: rect.maxY - bottom * (1 - k)),
+            control2: CGPoint(x: rect.minX + top + bottom * (1 - k), y: rect.maxY)
         )
         p.addLine(to: CGPoint(x: rect.maxX - top - bottom, y: rect.maxY))
         // Coin bas droit
-        p.addQuadCurve(
+        p.addCurve(
             to: CGPoint(x: rect.maxX - top, y: rect.maxY - bottom),
-            control: CGPoint(x: rect.maxX - top, y: rect.maxY)
+            control1: CGPoint(x: rect.maxX - top - bottom * (1 - k), y: rect.maxY),
+            control2: CGPoint(x: rect.maxX - top, y: rect.maxY - bottom * (1 - k))
         )
         p.addLine(to: CGPoint(x: rect.maxX - top, y: rect.minY + top))
         // Oreille droite
-        p.addQuadCurve(
+        p.addCurve(
             to: CGPoint(x: rect.maxX, y: rect.minY),
-            control: CGPoint(x: rect.maxX - top, y: rect.minY)
+            control1: CGPoint(x: rect.maxX - top, y: rect.minY + top * (1 - k)),
+            control2: CGPoint(x: rect.maxX - top * k, y: rect.minY)
         )
         p.closeSubpath()
         return p
@@ -65,6 +72,13 @@ struct NotchBackground: ViewModifier {
         }
     }
 
+    /// Verre : liseré franc. Noir : lueur à peine visible sur le bord bas (notch ouvert, île).
+    private func rimOpacity(_ glassOn: Bool) -> Double {
+        if glassOn { return 1 }
+        if isOpen { return 0.35 }
+        return style == .island ? 0.4 : 0
+    }
+
     private func decorate<S: Shape>(_ content: Content, shape: S) -> some View {
         let glassOn = glass && isOpen
         return content
@@ -82,7 +96,7 @@ struct NotchBackground: ViewModifier {
                         ),
                         lineWidth: 1
                     )
-                    .opacity(glassOn ? 1 : 0)
+                    .opacity(rimOpacity(glassOn))
                     .allowsHitTesting(false)
             }
     }

@@ -40,11 +40,27 @@ struct CompactNotchView: View {
         case .music:
             ArtworkView(image: media.artwork, cornerRadius: 6)
                 .frame(width: vm.notchSize.height - 10, height: vm.notchSize.height - 10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5)
+                )
+                .scaleEffect(media.isPlaying ? 1 : 0.86)
+                .opacity(media.isPlaying ? 1 : 0.6)
+                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: media.isPlaying)
                 .transition(.scale.combined(with: .opacity))
         case .timer:
-            Image(systemName: "timer")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.orange)
+            ZStack {
+                Circle().stroke(Color.orange.opacity(0.22), lineWidth: 2.5)
+                Circle()
+                    .trim(from: 0, to: CGFloat(1 - timer.progress))
+                    .stroke(Color.orange, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .animation(.linear(duration: 1), value: timer.progress)
+                Image(systemName: "timer")
+                    .font(.system(size: 7.5, weight: .heavy))
+                    .foregroundStyle(.orange)
+            }
+            .frame(width: 17, height: 17)
         case .event:
             Image(systemName: "calendar")
                 .font(.system(size: 13, weight: .semibold))
